@@ -43,14 +43,12 @@ where
 	) -> Result<SanitizedObject<T>, ApiError> {
 		let object_props: &mut ObjectProperties = self.obj.as_mut();
 
-		as_type_conversion!(
-			object_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")
-		);
+		object_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 
 		object_props.delete_attachment();
 
 		if let Some(actor_uri) = actor_uri {
-			as_type_conversion!(object_props.set_attributed_to_xsd_any_uri(actor_uri));
+			object_props.set_attributed_to_xsd_any_uri(actor_uri)?;
 		}
 
 		if let Some(name) = object_props.get_name_xsd_string() {
@@ -61,7 +59,7 @@ where
 				return Err(ApiError::OtherBadRequest);
 			}
 
-			as_type_conversion!(object_props.set_name_xsd_string(name));
+			object_props.set_name_xsd_string(name)?;
 		} else {
 			return Err(ApiError::OtherBadRequest);
 		}
@@ -87,7 +85,7 @@ where
 				let summary = summary.to_string();
 				let summary = summary.trim();
 
-				as_type_conversion!(object_props.set_summary_xsd_string(summary));
+				object_props.set_summary_xsd_string(summary)?;
 			} else {
 				return Err(ApiError::OtherBadRequest);
 			}
@@ -123,16 +121,16 @@ where
 		}
 
 		// Make sure that these two are always set to something, even if it's an empty Vec.
-		as_type_conversion!(object_props.set_many_to_xsd_any_uris(to));
-		as_type_conversion!(object_props.set_many_cc_xsd_any_uris(cc));
+		object_props.set_many_to_xsd_any_uris(to)?;
+		object_props.set_many_cc_xsd_any_uris(cc)?;
 
 		object_props.delete_bto();
 		object_props.delete_bcc();
 		object_props.media_type = None;
 		object_props.duration = None;
 
-		as_type_conversion!(object_props.set_id(object_uri));
-		as_type_conversion!(object_props.set_published(DateTime::<FixedOffset>::from(Utc::now())));
+		object_props.set_id(object_uri)?;
+		object_props.set_published(DateTime::<FixedOffset>::from(Utc::now()))?;
 
 		Ok(SanitizedObject { obj: self.obj })
 	}
@@ -164,35 +162,33 @@ where
 		let mut activity = Create::new();
 
 		let create_object_props: &mut ObjectProperties = activity.as_mut();
-		as_type_conversion!(
-			create_object_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")
-		);
-		as_type_conversion!(create_object_props.set_id(activity_uri));
-		as_type_conversion!(create_object_props.set_published(published));
-		as_type_conversion!(create_object_props.set_many_to_xsd_any_uris(
+		create_object_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
+		create_object_props.set_id(activity_uri)?;
+		create_object_props.set_published(published)?;
+		create_object_props.set_many_to_xsd_any_uris(
 			object_props
 				.get_many_to_xsd_any_uris()
 				.ok_or(ApiError::InternalServerError)
 				.unwrap()
 				.cloned()
-				.collect()
-		));
-		as_type_conversion!(create_object_props.set_many_cc_xsd_any_uris(
+				.collect(),
+		)?;
+		create_object_props.set_many_cc_xsd_any_uris(
 			object_props
 				.get_many_cc_xsd_any_uris()
 				.ok_or(ApiError::InternalServerError)
 				.unwrap()
 				.cloned()
-				.collect()
-		));
+				.collect(),
+		)?;
 
 		let create_props: &mut CreateProperties = activity.as_mut();
-		as_type_conversion!(create_props.set_actor_xsd_any_uri(actor_uri));
-		as_type_conversion!(create_props.set_object_base_box(
+		create_props.set_actor_xsd_any_uri(actor_uri)?;
+		create_props.set_object_base_box(
 			self.obj
 				.try_into()
-				.map_err(|_| ApiError::InternalServerError)?
-		));
+				.map_err(|_| ApiError::InternalServerError)?,
+		)?;
 
 		Ok(activity)
 	}

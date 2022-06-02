@@ -50,32 +50,32 @@ pub async fn get_user(
 	let user_props = user.as_mut();
 	let actor_url = url::activitypub_actor(&username);
 
-	as_type_conversion!(user_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
-	as_type_conversion!(user_props.set_id(&*actor_url));
+	user_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
+	user_props.set_id(&*actor_url)?;
 
 	let name: &str = columns.get(0);
-	as_type_conversion!(user_props.set_name_xsd_string(name));
+	user_props.set_name_xsd_string(name)?;
 
 	let bio: Option<&str> = columns.get(1);
 	if let Some(bio) = bio {
-		as_type_conversion!(user_props.set_summary_xsd_string(bio));
+		user_props.set_summary_xsd_string(bio)?;
 	}
 
 	let profile_picture_id: Option<&str> = columns.get(2);
 	if let Some(profile_picture_id) = profile_picture_id {
-		as_type_conversion!(user_props.set_icon_xsd_any_uri(format!(
+		user_props.set_icon_xsd_any_uri(format!(
 			"{}://{}/media/{}",
 			state.scheme, state.domain, profile_picture_id
-		)));
+		))?;
 	}
 
 	let user_ap_props = &mut user.extension;
 
-	as_type_conversion!(user_ap_props.set_preferred_username(username));
-	as_type_conversion!(user_ap_props.set_inbox(format!("{}/inbox", &actor_url)));
-	as_type_conversion!(user_ap_props.set_outbox(format!("{}/outbox", &actor_url)));
-	as_type_conversion!(user_ap_props.set_following(format!("{}/following", &actor_url)));
-	as_type_conversion!(user_ap_props.set_followers(format!("{}/followers", &actor_url)));
+	user_ap_props.set_preferred_username(username)?;
+	user_ap_props.set_inbox(format!("{}/inbox", &actor_url))?;
+	user_ap_props.set_outbox(format!("{}/outbox", &actor_url))?;
+	user_ap_props.set_following(format!("{}/following", &actor_url))?;
+	user_ap_props.set_followers(format!("{}/followers", &actor_url))?;
 
 	Ok(web::Json(user))
 }

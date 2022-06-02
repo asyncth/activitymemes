@@ -56,8 +56,8 @@ impl UnsanitizedCreate {
 				let internal_object_props: &ObjectProperties = internal_object.as_ref();
 				let published = internal_object_props.get_published().cloned().unwrap();
 
-				let internal_object: BaseBox = as_type_conversion!(internal_object.try_into());
-				as_type_conversion!(create_props.set_object_base_box(internal_object));
+				let internal_object: BaseBox = internal_object.try_into()?;
+				create_props.set_object_base_box(internal_object)?;
 
 				published
 			} else if obj.is_kind(NoteType) {
@@ -72,8 +72,8 @@ impl UnsanitizedCreate {
 				let internal_object_props: &ObjectProperties = internal_object.as_ref();
 				let published = internal_object_props.get_published().cloned().unwrap();
 
-				let internal_object: BaseBox = as_type_conversion!(internal_object.try_into());
-				as_type_conversion!(create_props.set_object_base_box(internal_object));
+				let internal_object: BaseBox = internal_object.try_into()?;
+				create_props.set_object_base_box(internal_object)?;
 
 				published
 			} else {
@@ -83,14 +83,14 @@ impl UnsanitizedCreate {
 			return Err(ApiError::OtherBadRequest);
 		};
 
-		as_type_conversion!(create_props.set_actor_xsd_any_uri(actor_url));
+		create_props.set_actor_xsd_any_uri(actor_url)?;
 
 		let create_activity_props: &mut ActivityProperties = activity.as_mut();
 		create_activity_props.delete_instrument();
 		create_activity_props.delete_result();
 
 		let create_object_props: &mut ObjectProperties = activity.as_mut();
-		as_type_conversion!(create_object_props.set_published(published));
+		create_object_props.set_published(published)?;
 
 		Ok(SanitizedCreate { obj: activity })
 	}

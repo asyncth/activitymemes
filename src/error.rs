@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use activitystreams::primitives::XsdAnyUriError;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
 use serde_json::json;
+use std::convert::Infallible;
 use std::fmt;
 use tracing::error;
 
@@ -81,7 +83,27 @@ impl ResponseError for ApiError {
 
 impl From<sqlx::Error> for ApiError {
 	fn from(err: sqlx::Error) -> Self {
-		error!(?err, "SQL Error");
+		error!(?err, "SQL error");
 		Self::InternalServerError
+	}
+}
+
+impl From<XsdAnyUriError> for ApiError {
+	fn from(err: XsdAnyUriError) -> Self {
+		error!(?err, "Failed to parse XsdAnyUri");
+		Self::InternalServerError
+	}
+}
+
+impl From<std::io::Error> for ApiError {
+	fn from(err: std::io::Error) -> Self {
+		error!(?err, "IO error");
+		Self::InternalServerError
+	}
+}
+
+impl From<Infallible> for ApiError {
+	fn from(_: Infallible) -> Self {
+		unreachable!();
 	}
 }

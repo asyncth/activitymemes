@@ -15,8 +15,6 @@
 
 #![forbid(unsafe_code)]
 
-#[macro_use]
-mod macros;
 mod account;
 mod activitypub;
 mod config;

@@ -79,12 +79,10 @@ async fn get_outbox_index(
 	let mut collection = OrderedCollection::new();
 	let collection_props: &mut ObjectProperties = collection.as_mut();
 
-	as_type_conversion!(
-		collection_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")
-	);
+	collection_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 
 	let id_url = format!("{}/outbox", url::activitypub_actor(&username));
-	as_type_conversion!(collection_props.set_id(id_url.as_str()));
+	collection_props.set_id(id_url.as_str())?;
 
 	let collection_props: &mut CollectionProperties = collection.as_mut();
 
@@ -93,12 +91,10 @@ async fn get_outbox_index(
 		.fetch_one(&state.db)
 		.await?
 		.get(0);
-	as_type_conversion!(collection_props
-		.set_total_items(u64::try_from(total_items).map_err(|_| ApiError::InternalServerError)?));
-	as_type_conversion!(collection_props.set_first_xsd_any_uri(format!("{}?page=true", id_url)));
-	as_type_conversion!(
-		collection_props.set_last_xsd_any_uri(format!("{}?min_id=0&page=true", id_url))
-	);
+	collection_props
+		.set_total_items(u64::try_from(total_items).map_err(|_| ApiError::InternalServerError)?)?;
+	collection_props.set_first_xsd_any_uri(format!("{}?page=true", id_url))?;
+	collection_props.set_last_xsd_any_uri(format!("{}?min_id=0&page=true", id_url))?;
 
 	Ok(web::Json(collection))
 }
@@ -149,15 +145,15 @@ async fn get_outbox_first_page(
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
+	page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 
 	let part_of_id_url = format!("{}/outbox", url::activitypub_actor(&username));
 
-	as_type_conversion!(page_props.set_id(format!("{}?page=true", part_of_id_url)));
+	page_props.set_id(format!("{}?page=true", part_of_id_url))?;
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
+	page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str())?;
 
 	let rows = sqlx::query(
 		"SELECT count, activity FROM activities WHERE user_id = $1 ORDER BY count DESC LIMIT 20",
@@ -175,19 +171,19 @@ async fn get_outbox_first_page(
 			.collect();
 		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
 
-		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
+		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
 			part_of_id_url, first_count
-		)));
+		))?;
 		if rows.len() == 20 {
-			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
+			page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
 				part_of_id_url, last_count
-			)));
+			))?;
 		}
 
 		let page_props: &mut CollectionProperties = page.as_mut();
-		as_type_conversion!(page_props.set_many_items_base_boxes(activities));
+		page_props.set_many_items_base_boxes(activities)?;
 	}
 
 	Ok(web::Json(page))
@@ -223,17 +219,15 @@ async fn get_outbox_max_count(
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
+	page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 
 	let part_of_id_url = format!("{}/outbox", url::activitypub_actor(&username));
 
-	as_type_conversion!(
-		page_props.set_id(format!("{}?max_id={}&page=true", part_of_id_url, max_count))
-	);
+	page_props.set_id(format!("{}?max_id={}&page=true", part_of_id_url, max_count))?;
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
+	page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str())?;
 
 	let rows = sqlx::query("SELECT count, activity FROM activities WHERE user_id = $1 AND count < $2 ORDER BY count DESC LIMIT 20")
         .bind(user_id)
@@ -250,19 +244,19 @@ async fn get_outbox_max_count(
 			.collect();
 		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
 
-		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
+		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
 			part_of_id_url, first_count
-		)));
+		))?;
 		if rows.len() == 20 {
-			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
+			page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
 				part_of_id_url, last_count
-			)));
+			))?;
 		}
 
 		let page_props: &mut CollectionProperties = page.as_mut();
-		as_type_conversion!(page_props.set_many_items_base_boxes(activities));
+		page_props.set_many_items_base_boxes(activities)?;
 	}
 
 	Ok(web::Json(page))
@@ -298,18 +292,18 @@ async fn get_outbox_min_count(
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
+	page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 
 	let part_of_outbox_url = format!("{}/outbox", url::activitypub_actor(&username));
 
-	as_type_conversion!(page_props.set_id(format!(
+	page_props.set_id(format!(
 		"{}?min_id={}&page=true",
 		part_of_outbox_url, min_count
-	)));
+	))?;
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_outbox_url.as_str()));
+	page_props.set_part_of_xsd_any_uri(part_of_outbox_url.as_str())?;
 
 	let rows = sqlx::query("SELECT * FROM (SELECT count, activity FROM activities WHERE user_id = $1 AND count > $2 ORDER BY count LIMIT 20) AS tmp ORDER BY count DESC")
         .bind(user_id)
@@ -326,19 +320,19 @@ async fn get_outbox_min_count(
 			.collect();
 		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
 
-		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
+		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
 			part_of_outbox_url, first_count
-		)));
+		))?;
 		if rows.len() == 20 {
-			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
+			page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
 				part_of_outbox_url, last_count
-			)));
+			))?;
 		}
 
 		let page_props: &mut CollectionProperties = page.as_mut();
-		as_type_conversion!(page_props.set_many_items_base_boxes(activities));
+		page_props.set_many_items_base_boxes(activities)?;
 	}
 
 	Ok(web::Json(page))
