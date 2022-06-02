@@ -16,6 +16,7 @@
 use crate::activitypub::outbox::post::object::UnsanitizedObject;
 use crate::error::ApiError;
 use crate::state::AppState;
+use crate::url;
 use activitystreams::object::Image;
 use actix_web::http::header;
 use actix_web::{web, HttpResponse};
@@ -30,13 +31,12 @@ pub async fn post_image(
 	username: String,
 ) -> Result<HttpResponse, ApiError> {
 	let id = Uuid::new_v4();
-	let shared_uri = format!("{}://{}/", state.scheme, state.domain);
-	let activity_uri = format!("{}activities/{}", shared_uri, id);
-	let object_uri = format!("{}/object", activity_uri);
-	let actor_uri = format!("{}users/{}", shared_uri, username);
+	let activity_url = url::activitypub_activity(id);
+	let object_url = url::activitypub_object(id);
+	let actor_url = url::activitypub_actor(&username);
 
-	let image = UnsanitizedObject::new(body).sanitize(&object_uri, Some(&actor_uri))?;
-	let activity = image.activity(&activity_uri, &actor_uri)?;
+	let image = UnsanitizedObject::new(body).sanitize(&object_url, Some(&actor_url))?;
+	let activity = image.activity(&activity_url, &actor_url)?;
 
 	let serialized_activity =
 		serde_json::to_value(activity).map_err(|_| ApiError::InternalServerError)?;
@@ -54,6 +54,6 @@ pub async fn post_image(
 		.await?;
 
 	Ok(HttpResponse::Created()
-		.insert_header((header::LOCATION, activity_uri))
+		.insert_header((header::LOCATION, activity_url))
 		.finish())
 }

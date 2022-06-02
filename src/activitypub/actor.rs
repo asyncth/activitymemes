@@ -15,6 +15,7 @@
 
 use crate::error::ApiError;
 use crate::state::AppState;
+use crate::url;
 use activitystreams::actor::properties::ApActorProperties;
 use activitystreams::actor::Person;
 use activitystreams::ext::{Ext, Extensible};
@@ -47,10 +48,10 @@ pub async fn get_user(
 
 	let mut user = Person::new().extend(ApActorProperties::default());
 	let user_props = user.as_mut();
-	let user_url = format!("{}://{}/users/{}", state.scheme, state.domain, username);
+	let actor_url = url::activitypub_actor(&username);
 
 	as_type_conversion!(user_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
-	as_type_conversion!(user_props.set_id(user_url.as_ref()));
+	as_type_conversion!(user_props.set_id(&*actor_url));
 
 	let name: &str = columns.get(0);
 	as_type_conversion!(user_props.set_name_xsd_string(name));
@@ -71,10 +72,10 @@ pub async fn get_user(
 	let user_ap_props = &mut user.extension;
 
 	as_type_conversion!(user_ap_props.set_preferred_username(username));
-	as_type_conversion!(user_ap_props.set_inbox(format!("{}/inbox", &user_url)));
-	as_type_conversion!(user_ap_props.set_outbox(format!("{}/outbox", &user_url)));
-	as_type_conversion!(user_ap_props.set_following(format!("{}/following", &user_url)));
-	as_type_conversion!(user_ap_props.set_followers(format!("{}/followers", &user_url)));
+	as_type_conversion!(user_ap_props.set_inbox(format!("{}/inbox", &actor_url)));
+	as_type_conversion!(user_ap_props.set_outbox(format!("{}/outbox", &actor_url)));
+	as_type_conversion!(user_ap_props.set_following(format!("{}/following", &actor_url)));
+	as_type_conversion!(user_ap_props.set_followers(format!("{}/followers", &actor_url)));
 
 	Ok(web::Json(user))
 }

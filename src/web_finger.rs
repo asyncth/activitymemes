@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::error::ApiError;
 use crate::state::AppState;
+use crate::{error::ApiError, url};
 use actix_web::{get, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -68,32 +68,29 @@ pub async fn web_finger(
 		return Err(ApiError::UserDoesNotExist);
 	}
 
-	let html_href = format!("{}://{}/@{}", state.scheme, state.domain, username);
-	let activitypub_actor_uri = format!("/users/{}", username);
-	let json_href = format!(
-		"{}://{}{}",
-		state.scheme, state.domain, activitypub_actor_uri
-	);
+	let html_user_page_url = url::html_user(username);
+	let relative_actor_url = format!("/users/{}", username);
+	let absolute_actor_url = format!("{}://{}{}", state.scheme, state.domain, relative_actor_url);
 
 	Ok(HttpResponse::Ok()
 		.content_type("application/jrd+json")
 		.append_header((
 			"Link",
-			format!("<{}>; rel=prefetch; as=fetch", activitypub_actor_uri),
+			format!("<{}>; rel=prefetch; as=fetch", relative_actor_url),
 		))
 		.json(WebFinger {
 			subject: Some(query.into_inner().resource),
-			aliases: Some(vec![html_href.clone(), json_href.clone()]),
+			aliases: Some(vec![html_user_page_url.clone(), relative_actor_url]),
 			links: vec![
 				WebFingerLink {
 					rel: String::from("http://webfinger.net/rel/profile-page"),
 					kind: String::from("text/html"),
-					href: html_href,
+					href: html_user_page_url,
 				},
 				WebFingerLink {
 					rel: String::from("self"),
 					kind: String::from("application/activity+json"),
-					href: json_href,
+					href: absolute_actor_url,
 				},
 			],
 		}))

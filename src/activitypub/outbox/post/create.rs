@@ -16,6 +16,7 @@
 use crate::activitypub::outbox::post::object::UnsanitizedObject;
 use crate::error::ApiError;
 use crate::state::AppState;
+use crate::url;
 use activitystreams::activity::properties::{ActivityProperties, CreateProperties};
 use activitystreams::activity::Create;
 use activitystreams::object::kind::{ImageType, NoteType};
@@ -36,7 +37,7 @@ impl UnsanitizedCreate {
 		Self { obj }
 	}
 
-	fn sanitize(self, activity_uri: &str, actor_uri: &str) -> Result<SanitizedCreate, ApiError> {
+	fn sanitize(self, activity_uri: &str, actor_url: &str) -> Result<SanitizedCreate, ApiError> {
 		let mut activity = UnsanitizedObject::new(self.obj)
 			.sanitize(activity_uri, None)?
 			.into_inner();
@@ -49,7 +50,7 @@ impl UnsanitizedCreate {
 					.into_concrete()
 					.map_err(|_| ApiError::InternalServerError)?;
 				let internal_object = UnsanitizedObject::new(internal_object)
-					.sanitize(&format!("{}/object", activity_uri), Some(actor_uri))?
+					.sanitize(&format!("{}/object", activity_uri), Some(actor_url))?
 					.into_inner();
 
 				let internal_object_props: &ObjectProperties = internal_object.as_ref();
@@ -65,7 +66,7 @@ impl UnsanitizedCreate {
 					.into_concrete()
 					.map_err(|_| ApiError::InternalServerError)?;
 				let internal_object = UnsanitizedObject::new(internal_object)
-					.sanitize(&format!("{}/object", activity_uri), Some(actor_uri))?
+					.sanitize(&format!("{}/object", activity_uri), Some(actor_url))?
 					.into_inner();
 
 				let internal_object_props: &ObjectProperties = internal_object.as_ref();
@@ -82,7 +83,7 @@ impl UnsanitizedCreate {
 			return Err(ApiError::OtherBadRequest);
 		};
 
-		as_type_conversion!(create_props.set_actor_xsd_any_uri(actor_uri));
+		as_type_conversion!(create_props.set_actor_xsd_any_uri(actor_url));
 
 		let create_activity_props: &mut ActivityProperties = activity.as_mut();
 		create_activity_props.delete_instrument();
@@ -113,12 +114,11 @@ pub async fn post_create(
 	username: String,
 ) -> Result<HttpResponse, ApiError> {
 	let id = Uuid::new_v4();
-	let shared_uri = format!("{}://{}/", state.scheme, state.domain);
-	let activity_uri = format!("{}activities/{}", shared_uri, id);
-	let actor_uri = format!("{}users/{}", shared_uri, username);
+	let activity_url = url::activitypub_activity(id);
+	let actor_url = url::activitypub_actor(&username);
 
 	let activity = UnsanitizedCreate::new(body)
-		.sanitize(&activity_uri, &actor_uri)?
+		.sanitize(&activity_url, &actor_url)?
 		.into_inner();
 	let serialized_activity =
 		serde_json::to_value(activity).map_err(|_| ApiError::InternalServerError)?;
@@ -136,6 +136,6 @@ pub async fn post_create(
 		.await?;
 
 	Ok(HttpResponse::Created()
-		.insert_header((header::LOCATION, activity_uri))
+		.insert_header((header::LOCATION, activity_url))
 		.finish())
 }

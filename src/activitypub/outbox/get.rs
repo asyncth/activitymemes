@@ -15,6 +15,7 @@
 
 use crate::error::ApiError;
 use crate::state::AppState;
+use crate::url;
 use activitystreams::collection::properties::{CollectionPageProperties, CollectionProperties};
 use activitystreams::collection::{OrderedCollection, OrderedCollectionPage};
 use activitystreams::object::properties::ObjectProperties;
@@ -82,10 +83,7 @@ async fn get_outbox_index(
 		collection_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")
 	);
 
-	let id_url = format!(
-		"{}://{}/users/{}/outbox",
-		state.scheme, state.domain, username
-	);
+	let id_url = format!("{}/outbox", url::activitypub_actor(&username));
 	as_type_conversion!(collection_props.set_id(id_url.as_str()));
 
 	let collection_props: &mut CollectionProperties = collection.as_mut();
@@ -153,16 +151,13 @@ async fn get_outbox_first_page(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_outbox_url = format!(
-		"{}://{}/users/{}/outbox",
-		state.scheme, state.domain, username
-	);
+	let part_of_id_url = format!("{}/outbox", url::activitypub_actor(&username));
 
-	as_type_conversion!(page_props.set_id(format!("{}?page=true", part_of_outbox_url)));
+	as_type_conversion!(page_props.set_id(format!("{}?page=true", part_of_id_url)));
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_outbox_url.as_str()));
+	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
 
 	let rows = sqlx::query(
 		"SELECT count, activity FROM activities WHERE user_id = $1 ORDER BY count DESC LIMIT 20",
@@ -182,12 +177,12 @@ async fn get_outbox_first_page(
 
 		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_outbox_url, first_count
+			part_of_id_url, first_count
 		)));
 		if rows.len() == 20 {
 			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_outbox_url, last_count
+				part_of_id_url, last_count
 			)));
 		}
 
@@ -230,19 +225,15 @@ async fn get_outbox_max_count(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_outbox_url = format!(
-		"{}://{}/users/{}/outbox",
-		state.scheme, state.domain, username
-	);
+	let part_of_id_url = format!("{}/outbox", url::activitypub_actor(&username));
 
-	as_type_conversion!(page_props.set_id(format!(
-		"{}?max_id={}&page=true",
-		part_of_outbox_url, max_count
-	)));
+	as_type_conversion!(
+		page_props.set_id(format!("{}?max_id={}&page=true", part_of_id_url, max_count))
+	);
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_outbox_url.as_str()));
+	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
 
 	let rows = sqlx::query("SELECT count, activity FROM activities WHERE user_id = $1 AND count < $2 ORDER BY count DESC LIMIT 20")
         .bind(user_id)
@@ -261,12 +252,12 @@ async fn get_outbox_max_count(
 
 		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_outbox_url, first_count
+			part_of_id_url, first_count
 		)));
 		if rows.len() == 20 {
 			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_outbox_url, last_count
+				part_of_id_url, last_count
 			)));
 		}
 
@@ -309,10 +300,7 @@ async fn get_outbox_min_count(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_outbox_url = format!(
-		"{}://{}/users/{}/outbox",
-		state.scheme, state.domain, username
-	);
+	let part_of_outbox_url = format!("{}/outbox", url::activitypub_actor(&username));
 
 	as_type_conversion!(page_props.set_id(format!(
 		"{}?min_id={}&page=true",

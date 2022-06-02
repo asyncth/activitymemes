@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account;
 use crate::error::ApiError;
 use crate::state::AppState;
+use crate::{account, url};
 use activitystreams::collection::properties::{CollectionPageProperties, CollectionProperties};
 use activitystreams::collection::{OrderedCollection, OrderedCollectionPage};
 use activitystreams::object::properties::ObjectProperties;
@@ -90,10 +90,9 @@ async fn get_inbox_index(
 		collection_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")
 	);
 
-	as_type_conversion!(collection_props.set_id(format!(
-		"{}://{}/users/{}/inbox",
-		state.scheme, state.domain, username
-	)));
+	as_type_conversion!(
+		collection_props.set_id(format!("{}/inbox", url::activitypub_actor(&username)))
+	);
 
 	let collection_props: &mut CollectionProperties = collection.as_mut();
 
@@ -166,15 +165,12 @@ async fn get_inbox_first_page(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_inbox_url = format!(
-		"{}://{}/users/{}/inbox",
-		state.scheme, state.domain, username
-	);
-	as_type_conversion!(page_props.set_id(format!("{}?page=true", part_of_inbox_url)));
+	let part_of_id_url = format!("{}/inbox", url::activitypub_actor(&username));
+	as_type_conversion!(page_props.set_id(format!("{}?page=true", part_of_id_url)));
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_inbox_url.as_str()));
+	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
 
 	let rows = sqlx::query("SELECT count, activity FROM activities WHERE $1 = ANY(to_mentions) OR $1 = ANY(cc_mentions) ORDER BY count DESC LIMIT 20")
         .bind(user_id)
@@ -192,12 +188,12 @@ async fn get_inbox_first_page(
 
 		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_inbox_url, first_count
+			part_of_id_url, first_count
 		)));
 		if rows.len() == 20 {
 			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_inbox_url, last_count
+				part_of_id_url, last_count
 			)));
 		}
 
@@ -240,19 +236,15 @@ async fn get_inbox_max_count(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_inbox_url = format!(
-		"{}://{}/users/{}/inbox",
-		state.scheme, state.domain, username
-	);
+	let part_of_id_url = format!("{}/inbox", url::activitypub_actor(&username));
 
-	as_type_conversion!(page_props.set_id(format!(
-		"{}?max_id={}&page=true",
-		part_of_inbox_url, max_count
-	)));
+	as_type_conversion!(
+		page_props.set_id(format!("{}?max_id={}&page=true", part_of_id_url, max_count))
+	);
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_inbox_url.as_str()));
+	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
 
 	let rows = sqlx::query("SELECT count, activity FROM activities WHERE ($1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)) AND count < $2 ORDER BY count DESC LIMIT 20")
         .bind(user_id)
@@ -271,12 +263,12 @@ async fn get_inbox_max_count(
 
 		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_inbox_url, first_count
+			part_of_id_url, first_count
 		)));
 		if rows.len() == 20 {
 			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_inbox_url, last_count
+				part_of_id_url, last_count
 			)));
 		}
 
@@ -319,19 +311,15 @@ async fn get_inbox_min_count(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_inbox_url = format!(
-		"{}://{}/users/{}/inbox",
-		state.scheme, state.domain, username
-	);
+	let part_of_id_url = format!("{}/inbox", url::activitypub_actor(&username));
 
-	as_type_conversion!(page_props.set_id(format!(
-		"{}?min_id={}&page=true",
-		part_of_inbox_url, min_count
-	)));
+	as_type_conversion!(
+		page_props.set_id(format!("{}?min_id={}&page=true", part_of_id_url, min_count))
+	);
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_inbox_url.as_str()));
+	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
 
 	let rows = sqlx::query("SELECT * FROM (SELECT count, activity FROM activities WHERE ($1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)) AND count > $2 ORDER BY count LIMIT 20) AS tmp ORDER BY count DESC")
         .bind(user_id)
@@ -350,12 +338,12 @@ async fn get_inbox_min_count(
 
 		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_inbox_url, first_count
+			part_of_id_url, first_count
 		)));
 		if rows.len() == 20 {
 			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_inbox_url, last_count
+				part_of_id_url, last_count
 			)));
 		}
 

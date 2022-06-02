@@ -15,6 +15,7 @@
 
 use crate::error::ApiError;
 use crate::state::AppState;
+use crate::url;
 use activitystreams::collection::properties::{CollectionPageProperties, CollectionProperties};
 use activitystreams::collection::{OrderedCollection, OrderedCollectionPage};
 use activitystreams::object::properties::ObjectProperties;
@@ -84,10 +85,7 @@ async fn get_following_index(
 		collection_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")
 	);
 
-	let id_url = format!(
-		"{}://{}/users/{}/followers",
-		state.scheme, state.domain, username
-	);
+	let id_url = format!("{}/followers", url::activitypub_actor(&username));
 	as_type_conversion!(collection_props.set_id(id_url.as_str()));
 
 	let collection_props: &mut CollectionProperties = collection.as_mut();
@@ -155,16 +153,13 @@ async fn get_following_first_page(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_followers_url = format!(
-		"{}://{}/users/{}/followers",
-		state.scheme, state.domain, username
-	);
+	let part_of_id_url = format!("{}/followers", url::activitypub_actor(&username));
 
-	as_type_conversion!(page_props.set_id(format!("{}?page=true", part_of_followers_url)));
+	as_type_conversion!(page_props.set_id(format!("{}?page=true", part_of_id_url)));
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_followers_url.as_str()));
+	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
 
 	let rows = sqlx::query(
         "SELECT following.inserted_at, users.this_instance, users.instance_url FROM following, users WHERE following.user_id = $1 AND following.user_id = users.id ORDER BY following.inserted_at DESC LIMIT 20",
@@ -182,7 +177,7 @@ async fn get_following_first_page(
 			.map(|row| {
 				let this_instance: bool = row.get(1);
 				if this_instance {
-					format!("{}://{}/users/{}", state.scheme, state.domain, username)
+					url::activitypub_actor(&username)
 				} else {
 					let instance_url: Option<String> = row.get(2);
 					instance_url.unwrap()
@@ -192,13 +187,13 @@ async fn get_following_first_page(
 
 		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_followers_url,
+			part_of_id_url,
 			first_timestamp.timestamp_millis()
 		)));
 		if rows.len() == 20 {
 			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_followers_url,
+				part_of_id_url,
 				last_timestamp.timestamp_millis()
 			)));
 		}
@@ -242,10 +237,7 @@ async fn get_following_max_timestamp(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_outbox_url = format!(
-		"{}://{}/users/{}/outbox",
-		state.scheme, state.domain, username
-	);
+	let part_of_outbox_url = format!("{}/outbox", url::activitypub_actor(&username));
 
 	as_type_conversion!(page_props.set_id(format!(
 		"{}?max_id={}&page=true",
@@ -270,7 +262,7 @@ async fn get_following_max_timestamp(
 			.map(|row| {
 				let this_instance: bool = row.get(1);
 				if this_instance {
-					format!("{}://{}/users/{}", state.scheme, state.domain, username)
+					url::activitypub_actor(&username)
 				} else {
 					let instance_url: Option<String> = row.get(2);
 					instance_url.unwrap()
@@ -330,10 +322,7 @@ async fn get_following_min_timestamp(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_outbox_url = format!(
-		"{}://{}/users/{}/outbox",
-		state.scheme, state.domain, username
-	);
+	let part_of_outbox_url = format!("{}/outbox", url::activitypub_actor(&username));
 
 	as_type_conversion!(page_props.set_id(format!(
 		"{}?min_id={}&page=true",
@@ -358,7 +347,7 @@ async fn get_following_min_timestamp(
 			.map(|row| {
 				let this_instance: bool = row.get(1);
 				if this_instance {
-					format!("{}://{}/users/{}", state.scheme, state.domain, username)
+					url::activitypub_actor(&username)
 				} else {
 					let instance_url: Option<String> = row.get(2);
 					instance_url.unwrap()

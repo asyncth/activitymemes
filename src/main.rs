@@ -23,6 +23,7 @@ mod config;
 mod error;
 mod routines;
 mod state;
+mod url;
 mod web_finger;
 
 use actix_web::{web, App, HttpServer};
@@ -52,6 +53,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
 	let config = Config::with_file("config.json")?;
 	let state = web::Data::new(AppState::new(config).await?);
+
+	url::init(&state);
 
 	HttpServer::new(move || {
 		App::new()
