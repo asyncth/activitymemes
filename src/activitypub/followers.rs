@@ -236,16 +236,16 @@ async fn get_followers_max_timestamp(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_outbox_url = format!("{}/outbox", url::activitypub_actor(&username));
+	let part_of_id_url = format!("{}/followers", url::activitypub_actor(&username));
 
 	as_type_conversion!(page_props.set_id(format!(
 		"{}?max_id={}&page=true",
-		part_of_outbox_url, max_timestamp
+		part_of_id_url, max_timestamp
 	)));
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_outbox_url.as_str()));
+	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
 
 	let rows = sqlx::query("SELECT following.inserted_at, users.this_instance, users.instance_url FROM following, users WHERE following.following_user_id = $1 AND following.inserted_at < $2 AND following.following_user_id = users.id ORDER BY following.inserted_at DESC LIMIT 20")
         .bind(user_id)
@@ -271,13 +271,13 @@ async fn get_followers_max_timestamp(
 
 		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_outbox_url,
+			part_of_id_url,
 			first_timestamp.timestamp_millis()
 		)));
 		if rows.len() == 20 {
 			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_outbox_url,
+				part_of_id_url,
 				last_timestamp.timestamp_millis()
 			)));
 		}
@@ -321,16 +321,16 @@ async fn get_followers_min_timestamp(
 
 	as_type_conversion!(page_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams"));
 
-	let part_of_outbox_url = format!("{}/outbox", url::activitypub_actor(&username));
+	let part_of_id_url = format!("{}/followers", url::activitypub_actor(&username));
 
 	as_type_conversion!(page_props.set_id(format!(
 		"{}?min_id={}&page=true",
-		part_of_outbox_url, min_timestamp
+		part_of_id_url, min_timestamp
 	)));
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
-	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_outbox_url.as_str()));
+	as_type_conversion!(page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str()));
 
 	let rows = sqlx::query("SELECT * FROM (SELECT following.inserted_at, users.this_instance, users.instance_url FROM following, users WHERE following.following_user_id = $1 AND following.inserted_at > $2 AND following.following_user_id = users.id ORDER BY following.inserted_at LIMIT 20) AS tmp ORDER BY inserted_at DESC")
         .bind(user_id)
@@ -356,13 +356,13 @@ async fn get_followers_min_timestamp(
 
 		as_type_conversion!(page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_outbox_url,
+			part_of_id_url,
 			first_timestamp.timestamp_millis()
 		)));
 		if rows.len() == 20 {
 			as_type_conversion!(page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_outbox_url,
+				part_of_id_url,
 				last_timestamp.timestamp_millis()
 			)));
 		}
