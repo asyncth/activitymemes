@@ -27,7 +27,7 @@ use pbkdf2::{
 };
 use serde::Deserialize;
 use sqlx::Row;
-use tracing::{error, instrument};
+use tracing::instrument;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SignInBody {
@@ -69,10 +69,7 @@ pub async fn sign_in(
 		(username, hashed_password)
 	};
 
-	let parsed_hash = PasswordHash::new(&hashed_password).map_err(|e| {
-		error!(?e, "Failed to parse hash");
-		ApiError::InternalServerError
-	})?;
+	let parsed_hash = PasswordHash::new(&hashed_password)?;
 
 	if Pbkdf2
 		.verify_password(body.password.as_bytes(), &parsed_hash)
@@ -95,11 +92,7 @@ pub async fn sign_in(
 		&Header::new(Algorithm::RS512),
 		&claims,
 		state.token_encoding_key.inner(),
-	)
-	.map_err(|e| {
-		error!(?e, "Failed to encode claims");
-		ApiError::InternalServerError
-	})?;
+	)?;
 
 	Ok(HttpResponse::Ok()
 		.cookie(

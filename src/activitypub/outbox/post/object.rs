@@ -184,11 +184,10 @@ where
 
 		let create_props: &mut CreateProperties = activity.as_mut();
 		create_props.set_actor_xsd_any_uri(actor_uri)?;
-		create_props.set_object_base_box(
-			self.obj
-				.try_into()
-				.map_err(|_| ApiError::InternalServerError)?,
-		)?;
+		create_props.set_object_base_box(self.obj).map_err(|_| {
+			// This error doesn't implement `Display` or `Debug`.
+			ApiError::InternalServerError
+		})?;
 
 		Ok(activity)
 	}

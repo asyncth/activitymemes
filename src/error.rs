@@ -16,9 +16,12 @@
 use activitystreams::primitives::XsdAnyUriError;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
-use serde_json::json;
+use jsonwebtoken::errors::Error as JwtError;
+use pbkdf2::password_hash::Error as Pbkdf2Error;
+use serde_json::{json, Error as SerdeJsonError};
 use std::convert::Infallible;
 use std::fmt;
+use std::num::TryFromIntError;
 use tracing::error;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -98,6 +101,34 @@ impl From<XsdAnyUriError> for ApiError {
 impl From<std::io::Error> for ApiError {
 	fn from(err: std::io::Error) -> Self {
 		error!(?err, "IO error");
+		Self::InternalServerError
+	}
+}
+
+impl From<Pbkdf2Error> for ApiError {
+	fn from(err: Pbkdf2Error) -> Self {
+		error!(?err, "Password hashing error");
+		Self::InternalServerError
+	}
+}
+
+impl From<JwtError> for ApiError {
+	fn from(err: JwtError) -> Self {
+		error!(?err, "JWT error");
+		Self::InternalServerError
+	}
+}
+
+impl From<SerdeJsonError> for ApiError {
+	fn from(err: SerdeJsonError) -> Self {
+		error!(?err, "JSON error");
+		Self::InternalServerError
+	}
+}
+
+impl From<TryFromIntError> for ApiError {
+	fn from(err: TryFromIntError) -> Self {
+		error!(?err, "Int conversion error");
 		Self::InternalServerError
 	}
 }

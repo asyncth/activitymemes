@@ -93,8 +93,7 @@ async fn get_following_index(
 		.fetch_one(&state.db)
 		.await?
 		.get(0);
-	collection_props
-		.set_total_items(u64::try_from(total_items).map_err(|_| ApiError::InternalServerError)?)?;
+	collection_props.set_total_items(u64::try_from(total_items)?)?;
 	collection_props.set_first_xsd_any_uri(format!("{}?page=true", id_url))?;
 	collection_props.set_last_xsd_any_uri(format!("{}?min_id=0&page=true", id_url))?;
 

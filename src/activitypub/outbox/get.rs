@@ -91,8 +91,7 @@ async fn get_outbox_index(
 		.fetch_one(&state.db)
 		.await?
 		.get(0);
-	collection_props
-		.set_total_items(u64::try_from(total_items).map_err(|_| ApiError::InternalServerError)?)?;
+	collection_props.set_total_items(u64::try_from(total_items)?)?;
 	collection_props.set_first_xsd_any_uri(format!("{}?page=true", id_url))?;
 	collection_props.set_last_xsd_any_uri(format!("{}?min_id=0&page=true", id_url))?;
 
@@ -169,7 +168,7 @@ async fn get_outbox_first_page(
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
 			.collect();
-		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
+		let activities = activities?;
 
 		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
@@ -242,7 +241,7 @@ async fn get_outbox_max_count(
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
 			.collect();
-		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
+		let activities = activities?;
 
 		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
@@ -318,7 +317,7 @@ async fn get_outbox_min_count(
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
 			.collect();
-		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
+		let activities = activities?;
 
 		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",

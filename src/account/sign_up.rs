@@ -25,7 +25,7 @@ use pbkdf2::{
 use regex::Regex;
 use serde::Deserialize;
 use sqlx::Row;
-use tracing::{error, instrument};
+use tracing::instrument;
 use uuid::Uuid;
 
 static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_-]*$").unwrap());
@@ -79,11 +79,7 @@ pub async fn sign_up(
 	let password_salt = RNG.with(|cell| SaltString::generate(&mut *cell.borrow_mut()));
 	let hashed_password = Pbkdf2
 		.hash_password(body.password.as_bytes(), &password_salt)
-		.map(|hash| hash.to_string())
-		.map_err(|e| {
-			error!(?e, "Failed to hash the password");
-			ApiError::InternalServerError
-		})?;
+		.map(|hash| hash.to_string())?;
 
 	let uuid = Uuid::new_v4();
 	sqlx::query(

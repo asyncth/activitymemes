@@ -45,10 +45,7 @@ impl UnsanitizedCreate {
 		let create_props: &mut CreateProperties = activity.as_mut();
 		let published = if let Some(obj) = create_props.get_object_base_box() {
 			if obj.is_kind(ImageType) {
-				let internal_object: Image = obj
-					.clone()
-					.into_concrete()
-					.map_err(|_| ApiError::InternalServerError)?;
+				let internal_object: Image = obj.clone().into_concrete()?;
 				let internal_object = UnsanitizedObject::new(internal_object)
 					.sanitize(&format!("{}/object", activity_uri), Some(actor_url))?
 					.into_inner();
@@ -61,10 +58,7 @@ impl UnsanitizedCreate {
 
 				published
 			} else if obj.is_kind(NoteType) {
-				let internal_object: Note = obj
-					.clone()
-					.into_concrete()
-					.map_err(|_| ApiError::InternalServerError)?;
+				let internal_object: Note = obj.clone().into_concrete()?;
 				let internal_object = UnsanitizedObject::new(internal_object)
 					.sanitize(&format!("{}/object", activity_uri), Some(actor_url))?
 					.into_inner();
@@ -120,8 +114,7 @@ pub async fn post_create(
 	let activity = UnsanitizedCreate::new(body)
 		.sanitize(&activity_url, &actor_url)?
 		.into_inner();
-	let serialized_activity =
-		serde_json::to_value(activity).map_err(|_| ApiError::InternalServerError)?;
+	let serialized_activity = serde_json::to_value(activity)?;
 
 	// Needed because we don't support `to` and `cc` yet.
 	let empty_vec: Vec<Uuid> = Vec::new();

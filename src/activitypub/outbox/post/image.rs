@@ -38,8 +38,7 @@ pub async fn post_image(
 	let image = UnsanitizedObject::new(body).sanitize(&object_url, Some(&actor_url))?;
 	let activity = image.activity(&activity_url, &actor_url)?;
 
-	let serialized_activity =
-		serde_json::to_value(activity).map_err(|_| ApiError::InternalServerError)?;
+	let serialized_activity = serde_json::to_value(activity)?;
 
 	// Needed because we don't support `to` and `cc` yet.
 	let empty_vec: Vec<Uuid> = Vec::new();

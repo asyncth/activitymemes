@@ -98,8 +98,7 @@ async fn get_inbox_index(
 	.fetch_one(&state.db)
 	.await?
 	.get(0);
-	collection_props
-		.set_total_items(u64::try_from(total_items).map_err(|_| ApiError::InternalServerError)?)?;
+	collection_props.set_total_items(u64::try_from(total_items)?)?;
 	collection_props.set_first_xsd_any_uri(format!(
 		"{}://{}/users/{}/inbox?page=true",
 		state.scheme, state.domain, username
@@ -179,7 +178,7 @@ async fn get_inbox_first_page(
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
 			.collect();
-		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
+		let activities = activities?;
 
 		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
@@ -252,7 +251,7 @@ async fn get_inbox_max_count(
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
 			.collect();
-		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
+		let activities = activities?;
 
 		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
@@ -325,7 +324,7 @@ async fn get_inbox_min_count(
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
 			.collect();
-		let activities = activities.map_err(|_| ApiError::InternalServerError)?;
+		let activities = activities?;
 
 		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
