@@ -33,8 +33,14 @@ pub async fn get_activity(
 
 	let row = sqlx::query("SELECT to_mentions, cc_mentions, is_public, activity FROM activities WHERE id = $1 AND this_instance = TRUE")
 		.bind(activity_id)
-		.fetch_one(&state.db)
+		.fetch_optional(&state.db)
 		.await?;
+
+	if row.is_none() {
+		return Err(ApiError::ResourceNotFound);
+	}
+
+	let row = row.unwrap();
 
 	let to: Vec<Uuid> = row.get(0);
 	let cc: Vec<Uuid> = row.get(1);
