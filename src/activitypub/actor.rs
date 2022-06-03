@@ -30,21 +30,16 @@ pub async fn get_user(
 	path: web::Path<String>,
 ) -> Result<web::Json<Ext<Person, ApActorProperties>>, ApiError> {
 	let username = path.into_inner();
-	let user_exists: bool = sqlx::query(
-		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1 AND this_instance = TRUE)",
-	)
-	.bind(&username)
-	.fetch_one(&state.db)
-	.await?
-	.get(0);
-	if !user_exists {
+
+	let row =
+		sqlx::query("SELECT name, bio, profile_picture_id FROM users WHERE username = $1 AND this_instance = TRUE")
+			.bind(&username)
+			.fetch_optional(&state.db)
+			.await?;
+	if row.is_none() {
 		return Err(ApiError::UserDoesNotExist);
 	}
-
-	let columns = sqlx::query("SELECT name, bio, profile_picture_id FROM users WHERE username = $1 AND this_instance = TRUE")
-		.bind(&username)
-		.fetch_one(&state.db)
-		.await?;
+	let row = row.unwrap();
 
 	let mut user = Person::new().extend(ApActorProperties::default());
 	let user_props = user.as_mut();
@@ -53,15 +48,15 @@ pub async fn get_user(
 	user_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 	user_props.set_id(&*actor_url)?;
 
-	let name: &str = columns.get(0);
+	let name: &str = row.get(0);
 	user_props.set_name_xsd_string(name)?;
 
-	let bio: Option<&str> = columns.get(1);
+	let bio: Option<&str> = row.get(1);
 	if let Some(bio) = bio {
 		user_props.set_summary_xsd_string(bio)?;
 	}
 
-	let profile_picture_id: Option<&str> = columns.get(2);
+	let profile_picture_id: Option<&str> = row.get(2);
 	if let Some(profile_picture_id) = profile_picture_id {
 		user_props.set_icon_xsd_any_uri(format!(
 			"{}://{}/media/{}",

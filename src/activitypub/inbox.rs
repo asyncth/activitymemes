@@ -65,23 +65,17 @@ async fn get_inbox_index(
 	path: web::Path<String>,
 ) -> Result<web::Json<OrderedCollection>, ApiError> {
 	let username = path.into_inner();
-	let user_exists: bool = sqlx::query(
-		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1 AND this_instance = TRUE)",
-	)
-	.bind(&username)
-	.fetch_one(&state.db)
-	.await?
-	.get(0);
-	if !user_exists {
-		return Err(ApiError::UserDoesNotExist);
-	}
 
-	let user_id: Uuid =
+	let user_id: Option<Uuid> =
 		sqlx::query("SELECT id FROM users WHERE username = $1 AND this_instance = TRUE")
 			.bind(&username)
-			.fetch_one(&state.db)
+			.fetch_optional(&state.db)
 			.await?
-			.get(0);
+			.map(|row| row.get(0));
+	if user_id.is_none() {
+		return Err(ApiError::UserDoesNotExist);
+	}
+	let user_id = user_id.unwrap();
 
 	let mut collection = OrderedCollection::new();
 	let collection_props: &mut ObjectProperties = collection.as_mut();
@@ -136,23 +130,17 @@ async fn get_inbox_first_page(
 	path: web::Path<String>,
 ) -> Result<web::Json<OrderedCollectionPage>, ApiError> {
 	let username = path.into_inner();
-	let user_exists: bool = sqlx::query(
-		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1 AND this_instance = TRUE)",
-	)
-	.bind(&username)
-	.fetch_one(&state.db)
-	.await?
-	.get(0);
-	if !user_exists {
-		return Err(ApiError::UserDoesNotExist);
-	}
 
-	let user_id: Uuid =
+	let user_id: Option<Uuid> =
 		sqlx::query("SELECT id FROM users WHERE username = $1 AND this_instance = TRUE")
 			.bind(&username)
-			.fetch_one(&state.db)
+			.fetch_optional(&state.db)
 			.await?
-			.get(0);
+			.map(|row| row.get(0));
+	if user_id.is_none() {
+		return Err(ApiError::UserDoesNotExist);
+	}
+	let user_id = user_id.unwrap();
 
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
@@ -205,23 +193,17 @@ async fn get_inbox_max_count(
 	path: web::Path<String>,
 ) -> Result<web::Json<OrderedCollectionPage>, ApiError> {
 	let username = path.into_inner();
-	let user_exists: bool = sqlx::query(
-		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1 AND this_instance = TRUE)",
-	)
-	.bind(&username)
-	.fetch_one(&state.db)
-	.await?
-	.get(0);
-	if !user_exists {
-		return Err(ApiError::UserDoesNotExist);
-	}
 
-	let user_id: Uuid =
+	let user_id: Option<Uuid> =
 		sqlx::query("SELECT id FROM users WHERE username = $1 AND this_instance = TRUE")
 			.bind(&username)
-			.fetch_one(&state.db)
+			.fetch_optional(&state.db)
 			.await?
-			.get(0);
+			.map(|row| row.get(0));
+	if user_id.is_none() {
+		return Err(ApiError::UserDoesNotExist);
+	}
+	let user_id = user_id.unwrap();
 
 	let max_count = query.max_count.unwrap();
 
@@ -278,23 +260,17 @@ async fn get_inbox_min_count(
 	path: web::Path<String>,
 ) -> Result<web::Json<OrderedCollectionPage>, ApiError> {
 	let username = path.into_inner();
-	let user_exists: bool = sqlx::query(
-		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1 AND this_instance = TRUE)",
-	)
-	.bind(&username)
-	.fetch_one(&state.db)
-	.await?
-	.get(0);
-	if !user_exists {
-		return Err(ApiError::UserDoesNotExist);
-	}
 
-	let user_id: Uuid =
+	let user_id: Option<Uuid> =
 		sqlx::query("SELECT id FROM users WHERE username = $1 AND this_instance = TRUE")
 			.bind(&username)
-			.fetch_one(&state.db)
+			.fetch_optional(&state.db)
 			.await?
-			.get(0);
+			.map(|row| row.get(0));
+	if user_id.is_none() {
+		return Err(ApiError::UserDoesNotExist);
+	}
+	let user_id = user_id.unwrap();
 
 	let min_count = query.min_count.unwrap();
 
