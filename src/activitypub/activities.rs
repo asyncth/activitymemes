@@ -31,25 +31,23 @@ pub async fn get_activity(
 	let activity_id = path.into_inner();
 	let activity_id = Uuid::parse_str(&activity_id).map_err(|_| ApiError::ResourceNotFound)?;
 
-	let row = sqlx::query("SELECT to_mentions, cc_mentions, is_public, activity FROM activities WHERE id = $1 AND this_instance = TRUE")
+	let row = sqlx::query("SELECT activity, is_public, to_mentions, cc_mentions FROM activities WHERE id = $1 AND this_instance = TRUE")
 		.bind(activity_id)
 		.fetch_optional(&state.db)
 		.await?;
-
 	if row.is_none() {
 		return Err(ApiError::ResourceNotFound);
 	}
-
 	let row = row.unwrap();
 
-	let to: Vec<Uuid> = row.get(0);
-	let cc: Vec<Uuid> = row.get(1);
-	let is_public: bool = row.get(2);
-	let activity: JsonValue = row.get(3);
-
+	let is_public: bool = row.get(1);
 	if is_public {
+		let activity: JsonValue = row.get(0);
 		return Ok(web::Json(activity));
 	}
+
+	let to: Vec<Uuid> = row.get(2);
+	let cc: Vec<Uuid> = row.get(3);
 
 	if let Some(username) = account::ensure_signed_in(&state, &req) {
 		let user_id: Uuid =
@@ -60,6 +58,7 @@ pub async fn get_activity(
 				.get(0);
 
 		if to.contains(&user_id) || cc.contains(&user_id) {
+			let activity: JsonValue = row.get(0);
 			return Ok(web::Json(activity));
 		}
 	}

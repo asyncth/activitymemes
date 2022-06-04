@@ -114,17 +114,25 @@ pub async fn post_create(
 	let activity = UnsanitizedCreate::new(body)
 		.sanitize(&activity_url, &actor_url)?
 		.into_inner();
+
+	let published_at = activity
+		.object_props
+		.get_published()
+		.unwrap()
+		.as_datetime()
+		.naive_utc();
 	let serialized_activity = serde_json::to_value(activity)?;
 
 	// Needed because we don't support `to` and `cc` yet.
 	let empty_vec: Vec<Uuid> = Vec::new();
 
-	sqlx::query("INSERT INTO activities (id, this_instance, user_id, to_mentions, cc_mentions, is_public, activity) VALUES ($1, TRUE, $2, $3, $4, TRUE, $5)")
+	sqlx::query("INSERT INTO activities (id, user_id, this_instance, published_at, activity, is_public, to_mentions, cc_mentions) VALUES ($1, $2, TRUE, $3, $4, TRUE, $5, $6)")
 		.bind(id)
 		.bind(user_id)
-		.bind(&empty_vec)
-		.bind(&empty_vec)
+		.bind(published_at)
 		.bind(serialized_activity)
+		.bind(&empty_vec)
+		.bind(&empty_vec)
 		.execute(&state.db)
 		.await?;
 

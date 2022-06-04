@@ -21,6 +21,7 @@ use activitystreams::collection::{OrderedCollection, OrderedCollectionPage};
 use activitystreams::object::properties::ObjectProperties;
 use activitystreams::BaseBox;
 use actix_web::{get, web, Either, HttpRequest};
+use chrono::NaiveDateTime;
 use serde::Deserialize;
 use sqlx::Row;
 use std::convert::TryFrom;
@@ -31,9 +32,9 @@ use uuid::Uuid;
 pub struct GetInboxQuery {
 	page: Option<bool>,
 	#[serde(rename = "max_id")]
-	max_count: Option<i64>,
+	max_timestamp: Option<i64>,
 	#[serde(rename = "min_id")]
-	min_count: Option<i64>,
+	min_timestamp: Option<i64>,
 }
 
 #[get("/users/{username}/inbox")]
@@ -111,14 +112,14 @@ async fn get_inbox_page(
 	query: web::Query<GetInboxQuery>,
 	path: web::Path<String>,
 ) -> Result<web::Json<OrderedCollectionPage>, ApiError> {
-	if query.max_count.is_some() && query.min_count.is_some() {
-		todo!("specifying both max_count and min_count");
+	if query.max_timestamp.is_some() && query.min_timestamp.is_some() {
+		todo!("specifying both max_timestamp and min_timestamp");
 	}
 
-	if query.max_count.is_some() {
-		return get_inbox_max_count(state, query, path).await;
-	} else if query.min_count.is_some() {
-		return get_inbox_min_count(state, query, path).await;
+	if query.max_timestamp.is_some() {
+		return get_inbox_max_timestamp(state, query, path).await;
+	} else if query.min_timestamp.is_some() {
+		return get_inbox_min_timestamp(state, query, path).await;
 	}
 
 	get_inbox_first_page(state, path).await
@@ -154,28 +155,25 @@ async fn get_inbox_first_page(
 
 	page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str())?;
 
-	let rows = sqlx::query("SELECT count, activity FROM activities WHERE $1 = ANY(to_mentions) OR $1 = ANY(cc_mentions) ORDER BY count DESC LIMIT 20")
+	let rows = sqlx::query("SELECT published_at, activity FROM activities WHERE $1 = ANY(to_mentions) OR $1 = ANY(cc_mentions) ORDER BY published_at DESC LIMIT 20")
         .bind(user_id)
         .fetch_all(&state.db)
         .await?;
 
 	if !rows.is_empty() {
-		let first_count: i64 = rows[0].get(0);
-		let last_count: i64 = rows[rows.len() - 1].get(0);
+		let last_timestamp: NaiveDateTime = rows[rows.len() - 1].get(0);
+
 		let activities: Result<Vec<BaseBox>, serde_json::Error> = rows
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
 			.collect();
 		let activities = activities?;
 
-		page_props.set_prev_xsd_any_uri(format!(
-			"{}?min_id={}&page=true",
-			part_of_id_url, first_count
-		))?;
 		if rows.len() == 20 {
 			page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_id_url, last_count
+				part_of_id_url,
+				last_timestamp.timestamp_millis()
 			))?;
 		}
 
@@ -187,7 +185,7 @@ async fn get_inbox_first_page(
 }
 
 #[instrument]
-async fn get_inbox_max_count(
+async fn get_inbox_max_timestamp(
 	state: web::Data<AppState>,
 	query: web::Query<GetInboxQuery>,
 	path: web::Path<String>,
@@ -205,7 +203,7 @@ async fn get_inbox_max_count(
 	}
 	let user_id = user_id.unwrap();
 
-	let max_count = query.max_count.unwrap();
+	let max_timestamp = query.max_timestamp.unwrap();
 
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
@@ -214,21 +212,25 @@ async fn get_inbox_max_count(
 
 	let part_of_id_url = format!("{}/inbox", url::activitypub_actor(&username));
 
-	page_props.set_id(format!("{}?max_id={}&page=true", part_of_id_url, max_count))?;
+	page_props.set_id(format!(
+		"{}?max_id={}&page=true",
+		part_of_id_url, max_timestamp
+	))?;
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
 	page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str())?;
 
-	let rows = sqlx::query("SELECT count, activity FROM activities WHERE ($1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)) AND count < $2 ORDER BY count DESC LIMIT 20")
+	let rows = sqlx::query("SELECT published_at, activity FROM activities WHERE ($1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)) AND published_at < $2 ORDER BY published_at DESC LIMIT 20")
         .bind(user_id)
-        .bind(max_count)
+        .bind(max_timestamp)
         .fetch_all(&state.db)
         .await?;
 
 	if !rows.is_empty() {
-		let first_count: i64 = rows[0].get(0);
-		let last_count: i64 = rows[rows.len() - 1].get(0);
+		let first_timestamp: NaiveDateTime = rows[0].get(0);
+		let last_timestamp: NaiveDateTime = rows[rows.len() - 1].get(0);
+
 		let activities: Result<Vec<BaseBox>, serde_json::Error> = rows
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
@@ -237,12 +239,14 @@ async fn get_inbox_max_count(
 
 		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_id_url, first_count
+			part_of_id_url,
+			first_timestamp.timestamp_millis()
 		))?;
 		if rows.len() == 20 {
 			page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_id_url, last_count
+				part_of_id_url,
+				last_timestamp.timestamp_millis()
 			))?;
 		}
 
@@ -254,7 +258,7 @@ async fn get_inbox_max_count(
 }
 
 #[instrument]
-async fn get_inbox_min_count(
+async fn get_inbox_min_timestamp(
 	state: web::Data<AppState>,
 	query: web::Query<GetInboxQuery>,
 	path: web::Path<String>,
@@ -272,7 +276,7 @@ async fn get_inbox_min_count(
 	}
 	let user_id = user_id.unwrap();
 
-	let min_count = query.min_count.unwrap();
+	let min_timestamp = query.min_timestamp.unwrap();
 
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
@@ -281,21 +285,25 @@ async fn get_inbox_min_count(
 
 	let part_of_id_url = format!("{}/inbox", url::activitypub_actor(&username));
 
-	page_props.set_id(format!("{}?min_id={}&page=true", part_of_id_url, min_count))?;
+	page_props.set_id(format!(
+		"{}?min_id={}&page=true",
+		part_of_id_url, min_timestamp
+	))?;
 
 	let page_props: &mut CollectionPageProperties = page.as_mut();
 
 	page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str())?;
 
-	let rows = sqlx::query("SELECT * FROM (SELECT count, activity FROM activities WHERE ($1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)) AND count > $2 ORDER BY count LIMIT 20) AS tmp ORDER BY count DESC")
+	let rows = sqlx::query("SELECT * FROM (SELECT published_at, activity FROM activities WHERE ($1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)) AND published_at > $2 ORDER BY published_at LIMIT 20) AS tmp ORDER BY published_at DESC")
         .bind(user_id)
-        .bind(min_count)
+        .bind(min_timestamp)
         .fetch_all(&state.db)
         .await?;
 
 	if !rows.is_empty() {
-		let first_count: i64 = rows[0].get(0);
-		let last_count: i64 = rows[rows.len() - 1].get(0);
+		let first_timestamp: NaiveDateTime = rows[0].get(0);
+		let last_timestamp: NaiveDateTime = rows[rows.len() - 1].get(0);
+
 		let activities: Result<Vec<BaseBox>, serde_json::Error> = rows
 			.iter()
 			.map(|row| serde_json::from_value(row.get(1)))
@@ -304,12 +312,14 @@ async fn get_inbox_min_count(
 
 		page_props.set_prev_xsd_any_uri(format!(
 			"{}?min_id={}&page=true",
-			part_of_id_url, first_count
+			part_of_id_url,
+			first_timestamp.timestamp_millis()
 		))?;
 		if rows.len() == 20 {
 			page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
-				part_of_id_url, last_count
+				part_of_id_url,
+				last_timestamp.timestamp_millis()
 			))?;
 		}
 

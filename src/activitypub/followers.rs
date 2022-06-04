@@ -151,7 +151,6 @@ async fn get_followers_first_page(
     .await?;
 
 	if !rows.is_empty() {
-		let first_timestamp: NaiveDateTime = rows[0].get(0);
 		let last_timestamp: NaiveDateTime = rows[rows.len() - 1].get(0);
 
 		let actors: Vec<String> = rows
@@ -167,11 +166,6 @@ async fn get_followers_first_page(
 			})
 			.collect();
 
-		page_props.set_prev_xsd_any_uri(format!(
-			"{}?min_id={}&page=true",
-			part_of_id_url,
-			first_timestamp.timestamp_millis()
-		))?;
 		if rows.len() == 20 {
 			page_props.set_next_xsd_any_uri(format!(
 				"{}?max_id={}&page=true",
