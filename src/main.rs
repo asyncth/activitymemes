@@ -26,11 +26,14 @@ mod web_finger;
 
 use actix_web::{web, App, HttpServer};
 use config::Config;
+use sqlx::migrate::Migrator;
 use state::AppState;
 use std::error::Error;
 use std::process;
 use tracing::{instrument, Level};
 use tracing_subscriber::FmtSubscriber;
+
+static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 #[actix_web::main]
 async fn main() {
@@ -51,6 +54,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
 	let config = Config::with_file("config.json")?;
 	let state = web::Data::new(AppState::new(config).await?);
+
+	// Run database migrations.
+	MIGRATOR.run(&state.db).await?;
 
 	url::init(&state);
 
