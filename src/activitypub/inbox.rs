@@ -204,6 +204,7 @@ async fn get_inbox_max_timestamp(
 	let user_id = user_id.unwrap();
 
 	let max_timestamp = query.max_timestamp.unwrap();
+	let max_timestamp = NaiveDateTime::from_timestamp(max_timestamp / 1000, ((max_timestamp % 1000) * 1000000) as u32);
 
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
@@ -277,6 +278,7 @@ async fn get_inbox_min_timestamp(
 	let user_id = user_id.unwrap();
 
 	let min_timestamp = query.min_timestamp.unwrap();
+	let min_timestamp = NaiveDateTime::from_timestamp(min_timestamp / 1000, ((min_timestamp % 1000) * 1000000) as u32);
 
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();

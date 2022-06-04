@@ -83,7 +83,7 @@ async fn get_followers_index(
 	let collection_props: &mut CollectionProperties = collection.as_mut();
 
 	let total_items: i64 =
-		sqlx::query("SELECT COUNT(1) FROM following WHERE following_user_id = $1")
+		sqlx::query("SELECT COUNT(1) FROM follows WHERE object_user_id = $1")
 			.bind(user_id)
 			.fetch_one(&state.db)
 			.await?
@@ -144,7 +144,7 @@ async fn get_followers_first_page(
 	page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str())?;
 
 	let rows = sqlx::query(
-        "SELECT following.inserted_at, users.this_instance, users.instance_url FROM following, users WHERE following.following_user_id = $1 AND following.following_user_id = users.id ORDER BY following.inserted_at DESC LIMIT 20",
+        "SELECT follows.following_since, users.this_instance, users.instance_url FROM follows, users WHERE follows.object_user_id = $1 AND follows.object_user_id = users.id ORDER BY follows.following_since DESC LIMIT 20",
     )
     .bind(user_id)
     .fetch_all(&state.db)
@@ -201,6 +201,7 @@ async fn get_followers_max_timestamp(
 	let user_id = user_id.unwrap();
 
 	let max_timestamp = query.max_timestamp.unwrap();
+	let max_timestamp = NaiveDateTime::from_timestamp(max_timestamp / 1000, ((max_timestamp % 1000) * 1000000) as u32);
 
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
@@ -218,7 +219,7 @@ async fn get_followers_max_timestamp(
 
 	page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str())?;
 
-	let rows = sqlx::query("SELECT following.inserted_at, users.this_instance, users.instance_url FROM following, users WHERE following.following_user_id = $1 AND following.inserted_at < $2 AND following.following_user_id = users.id ORDER BY following.inserted_at DESC LIMIT 20")
+	let rows = sqlx::query("SELECT follows.following_since, users.this_instance, users.instance_url FROM follows, users WHERE follows.object_user_id = $1 AND follows.following_since < $2 AND follows.object_user_id = users.id ORDER BY follows.following_since DESC LIMIT 20")
         .bind(user_id)
         .bind(max_timestamp)
         .fetch_all(&state.db)
@@ -280,6 +281,7 @@ async fn get_followers_min_timestamp(
 	let user_id = user_id.unwrap();
 
 	let min_timestamp = query.min_timestamp.unwrap();
+	let min_timestamp = NaiveDateTime::from_timestamp(min_timestamp / 1000, ((min_timestamp % 1000) * 1000000) as u32);
 
 	let mut page = OrderedCollectionPage::new();
 	let page_props: &mut ObjectProperties = page.as_mut();
@@ -297,7 +299,7 @@ async fn get_followers_min_timestamp(
 
 	page_props.set_part_of_xsd_any_uri(part_of_id_url.as_str())?;
 
-	let rows = sqlx::query("SELECT * FROM (SELECT following.inserted_at, users.this_instance, users.instance_url FROM following, users WHERE following.following_user_id = $1 AND following.inserted_at > $2 AND following.following_user_id = users.id ORDER BY following.inserted_at LIMIT 20) AS tmp ORDER BY inserted_at DESC")
+	let rows = sqlx::query("SELECT * FROM (SELECT follows.following_since, users.this_instance, users.instance_url FROM follows, users WHERE follows.object_user_id = $1 AND follows.following_since > $2 AND follows.object_user_id = users.id ORDER BY follows.following_since LIMIT 20) AS tmp ORDER BY following_since DESC")
         .bind(user_id)
         .bind(min_timestamp)
         .fetch_all(&state.db)
