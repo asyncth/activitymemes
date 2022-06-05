@@ -13,8 +13,5 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-mod get;
 mod post;
-
-pub use get::get_outbox;
 pub use post::post_to_outbox;

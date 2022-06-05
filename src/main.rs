@@ -18,6 +18,7 @@
 mod account;
 mod activitypub;
 mod config;
+mod endpoints;
 mod error;
 mod routines;
 mod state;
@@ -64,13 +65,16 @@ async fn run() -> Result<(), Box<dyn Error>> {
 		App::new()
 			.app_data(state.clone())
 			.service(web_finger::web_finger)
-			.service(activitypub::actor::get_user)
-			.service(activitypub::outbox::get_outbox)
 			.service(activitypub::outbox::post_to_outbox)
-			.service(activitypub::inbox::get_inbox)
-			.service(activitypub::followers::get_followers)
-			.service(activitypub::following::get_following)
 			.service(activitypub::activities::get_activity)
+			.service(
+				web::scope("/users")
+					.service(endpoints::users::get_user)
+					.service(endpoints::users::get_inbox)
+					.service(endpoints::users::get_outbox)
+					.service(endpoints::users::get_followers)
+					.service(endpoints::users::get_following),
+			)
 			.service(
 				web::scope("/account")
 					.service(account::sign_up::sign_up)
