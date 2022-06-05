@@ -135,8 +135,8 @@ where
 		let collection_props: &mut CollectionProperties = collection.as_mut();
 
 		collection_props.set_total_items(self.len(data).await?)?;
-		collection_props.set_first_xsd_any_uri(format!("{}/inbox?page=true", id))?;
-		collection_props.set_last_xsd_any_uri(format!("{}/inbox?min_id=0&page=true", id))?;
+		collection_props.set_first_xsd_any_uri(format!("{}?page=true", id))?;
+		collection_props.set_last_xsd_any_uri(format!("{}?min_id=0&page=true", id))?;
 
 		Ok(collection)
 	}
