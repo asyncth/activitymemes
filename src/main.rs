@@ -73,7 +73,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
 					.service(endpoints::users::get_followers)
 					.service(endpoints::users::get_following),
 			)
-			.service(web::scope("/activities").service(endpoints::activities::get_activity))
+			.service(
+				web::scope("/activities")
+					.service(endpoints::activities::get_activity)
+					.service(endpoints::activities::get_object),
+			)
 			.service(endpoints::get_web_finger)
 			.service(
 				web::scope("/account")
