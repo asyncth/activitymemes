@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-mod followers;
-mod following;
-mod inbox;
-mod outbox;
+pub mod followers;
+pub mod following;
+pub mod inbox;
+pub mod outbox;
 
 pub use followers::get_followers;
 pub use following::get_following;
 pub use inbox::get_inbox;
+pub use inbox::post_inbox;
 pub use outbox::get_outbox;
+pub use outbox::post_outbox;
 
 use crate::error::ApiError;
 use crate::state::AppState;

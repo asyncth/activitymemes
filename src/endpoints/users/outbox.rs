@@ -13,12 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::account;
 use crate::activitypub::collections::outbox::{Data, Outbox};
 use crate::activitypub::collections::Collection;
+use crate::activitypub::outbox;
 use crate::error::ApiError;
 use crate::state::AppState;
 use activitystreams::collection::{OrderedCollection, OrderedCollectionPage};
-use actix_web::{get, web, Either};
+use activitystreams::object::ObjectBox;
+use actix_web::http::header;
+use actix_web::{get, post, web, Either, HttpRequest, HttpResponse};
 use serde::Deserialize;
 use sqlx::Row;
 use tracing::instrument;
@@ -86,4 +90,43 @@ pub async fn get_outbox(
 		.index_page(&data)
 		.await
 		.map(|val| Either::Left(web::Json(val)))
+}
+
+#[post("/{username}/outbox")]
+#[instrument]
+pub async fn post_outbox(
+	state: web::Data<AppState>,
+	path: web::Path<String>,
+	body: web::Json<ObjectBox>,
+	req: HttpRequest,
+) -> Result<HttpResponse, ApiError> {
+	let content_type = req
+		.headers()
+		.get(header::CONTENT_TYPE)
+		.ok_or(ApiError::OtherBadRequest)?;
+	if !(content_type == "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\""
+		|| content_type == "application/activity+json")
+	{
+		return Err(ApiError::OtherBadRequest);
+	}
+
+	let username = path.into_inner();
+	let user_id: Option<Uuid> =
+		sqlx::query("SELECT id FROM users WHERE username = $1 AND this_instance = TRUE")
+			.bind(&username)
+			.fetch_optional(&state.db)
+			.await?
+			.map(|row| row.get(0));
+	if user_id.is_none() {
+		return Err(ApiError::UserDoesNotExist);
+	}
+	let user_id = user_id.unwrap();
+
+	match account::ensure_signed_in(&state, &req) {
+		Some(session_username) if username == session_username => (),
+		Some(_) => return Err(ApiError::Forbidden),
+		None => return Err(ApiError::NotSignedIn),
+	}
+
+	outbox::post_to_outbox(&state, user_id, &username, body).await
 }

@@ -22,11 +22,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 
-pub mod sign_in;
-pub mod sign_out;
-pub mod sign_up;
-
-static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\S+@\S+\.\S+$").unwrap());
+pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\S+@\S+\.\S+$").unwrap());
 
 thread_local! {
 	pub static RNG: RefCell<ThreadRng> = RefCell::new(ThreadRng::default());

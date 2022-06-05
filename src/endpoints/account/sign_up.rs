@@ -31,7 +31,7 @@ use uuid::Uuid;
 static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_-]*$").unwrap());
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct SignUpBody {
+pub struct PostSignUpBody {
 	username: String,
 	email: String,
 	password: String,
@@ -39,9 +39,9 @@ pub struct SignUpBody {
 
 #[post("/sign-up")]
 #[instrument]
-pub async fn sign_up(
+pub async fn post_sign_up(
 	state: web::Data<AppState>,
-	body: web::Json<SignUpBody>,
+	body: web::Json<PostSignUpBody>,
 ) -> Result<HttpResponse, ApiError> {
 	if !USERNAME_REGEX.is_match(&body.username) {
 		return Err(ApiError::InvalidUsername);

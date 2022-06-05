@@ -13,27 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::activitypub::outbox::post::object::UnsanitizedObject;
+use crate::activitypub::outbox::object::UnsanitizedObject;
 use crate::error::ApiError;
 use crate::state::AppState;
 use crate::url;
 use activitystreams::object::Image;
 use actix_web::http::header;
-use actix_web::{web, HttpResponse};
+use actix_web::HttpResponse;
 use tracing::instrument;
 use uuid::Uuid;
 
 #[instrument]
 pub async fn post_image(
-	state: web::Data<AppState>,
+	state: &AppState,
 	body: Image,
 	user_id: Uuid,
-	username: String,
+	username: &str,
 ) -> Result<HttpResponse, ApiError> {
 	let id = Uuid::new_v4();
 	let activity_url = url::activitypub_activity(id);
 	let object_url = url::activitypub_object(id);
-	let actor_url = url::activitypub_actor(&username);
+	let actor_url = url::activitypub_actor(username);
 
 	let image = UnsanitizedObject::new(body).sanitize(&object_url, Some(&actor_url))?;
 	let activity = image.activity(&activity_url, &actor_url)?;

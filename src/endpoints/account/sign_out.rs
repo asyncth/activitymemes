@@ -20,7 +20,7 @@ use tracing::instrument;
 
 #[post("/sign-out")]
 #[instrument]
-pub async fn sign_out(
+pub async fn post_sign_out(
 	state: web::Data<AppState>,
 	req: HttpRequest,
 ) -> Result<HttpResponse, ApiError> {

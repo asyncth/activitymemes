@@ -18,7 +18,7 @@ use crate::activitypub::collections::Collection;
 use crate::error::ApiError;
 use crate::state::AppState;
 use activitystreams::collection::{OrderedCollection, OrderedCollectionPage};
-use actix_web::{get, web, Either};
+use actix_web::{get, post, web, Either, HttpResponse};
 use serde::Deserialize;
 use sqlx::Row;
 use tracing::instrument;
@@ -86,4 +86,10 @@ pub async fn get_inbox(
 		.index_page(&data)
 		.await
 		.map(|val| Either::Left(web::Json(val)))
+}
+
+#[post("/{username}/inbox")]
+#[instrument]
+pub async fn post_inbox() -> HttpResponse {
+	HttpResponse::MethodNotAllowed().finish()
 }

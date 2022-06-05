@@ -23,7 +23,6 @@ mod error;
 mod routines;
 mod state;
 mod url;
-mod web_finger;
 
 use actix_web::{web, App, HttpServer};
 use config::Config;
@@ -64,22 +63,23 @@ async fn run() -> Result<(), Box<dyn Error>> {
 	HttpServer::new(move || {
 		App::new()
 			.app_data(state.clone())
-			.service(web_finger::web_finger)
-			.service(activitypub::outbox::post_to_outbox)
-			.service(activitypub::activities::get_activity)
 			.service(
 				web::scope("/users")
 					.service(endpoints::users::get_user)
 					.service(endpoints::users::get_inbox)
+					.service(endpoints::users::post_inbox)
 					.service(endpoints::users::get_outbox)
+					.service(endpoints::users::post_outbox)
 					.service(endpoints::users::get_followers)
 					.service(endpoints::users::get_following),
 			)
+			.service(web::scope("/activities").service(endpoints::activities::get_activity))
+			.service(endpoints::get_web_finger)
 			.service(
 				web::scope("/account")
-					.service(account::sign_up::sign_up)
-					.service(account::sign_in::sign_in)
-					.service(account::sign_out::sign_out),
+					.service(endpoints::account::post_sign_up)
+					.service(endpoints::account::post_sign_in)
+					.service(endpoints::account::post_sign_out),
 			)
 	})
 	.bind("127.0.0.1:8080")?

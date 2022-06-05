@@ -13,5 +13,48 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-mod post;
-pub use post::post_to_outbox;
+mod create;
+mod image;
+mod object;
+
+use crate::error::ApiError;
+use crate::state::AppState;
+use activitystreams::activity::kind::{
+	AcceptType, CreateType, DeleteType, FollowType, LikeType, RemoveType, UpdateType,
+};
+use activitystreams::activity::Create;
+use activitystreams::object::kind::{ImageType, NoteType};
+use activitystreams::object::{Image, ObjectBox};
+use actix_web::{web, HttpResponse};
+use tracing::instrument;
+use uuid::Uuid;
+
+#[instrument]
+pub async fn post_to_outbox(
+	state: &AppState,
+	user_id: Uuid,
+	username: &str,
+	body: web::Json<ObjectBox>,
+) -> Result<HttpResponse, ApiError> {
+	Ok(match body {
+		// Activities
+		body if body.is_kind(CreateType) => {
+			let body: Create = body.to_owned().into_concrete().unwrap();
+			create::post_create(state, body, user_id, username).await?
+		}
+		body if body.is_kind(AcceptType) => todo!("AcceptType"),
+		body if body.is_kind(DeleteType) => todo!("DeleteType"),
+		body if body.is_kind(FollowType) => todo!("FollowType"),
+		body if body.is_kind(LikeType) => todo!("LikeType"),
+		body if body.is_kind(RemoveType) => todo!("RemoveType"),
+		body if body.is_kind(UpdateType) => todo!("UpdateType"),
+		// Non-activity objects
+		body if body.is_kind(ImageType) => {
+			let body: Image = body.to_owned().into_concrete().unwrap();
+			image::post_image(state, body, user_id, username).await?
+		}
+		body if body.is_kind(NoteType) => todo!("NoteType"),
+		// Other
+		_ => todo!("Other"),
+	})
+}

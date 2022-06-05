@@ -36,15 +36,15 @@ pub struct WebFinger {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct WebFingerQuery {
+pub struct GetWebFingerQuery {
 	resource: String,
 }
 
 #[get("/.well-known/webfinger")]
 #[instrument]
-pub async fn web_finger(
+pub async fn get_web_finger(
 	state: web::Data<AppState>,
-	query: web::Query<WebFingerQuery>,
+	query: web::Query<GetWebFingerQuery>,
 ) -> Result<HttpResponse, ApiError> {
 	if !query.resource.contains("acct:") || !query.resource.contains('@') {
 		return Err(ApiError::IncorrectResourceQuery);

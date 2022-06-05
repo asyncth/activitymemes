@@ -30,16 +30,16 @@ use sqlx::Row;
 use tracing::instrument;
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct SignInBody {
+pub struct PostSignIn {
 	email: String,
 	password: String,
 }
 
 #[post("/sign-in")]
 #[instrument]
-pub async fn sign_in(
+pub async fn post_sign_in(
 	state: web::Data<AppState>,
-	body: web::Json<SignInBody>,
+	body: web::Json<PostSignIn>,
 ) -> Result<HttpResponse, ApiError> {
 	if !EMAIL_REGEX.is_match(&body.email) {
 		return Err(ApiError::InvalidEmail);

@@ -21,7 +21,7 @@ use sqlx::Row;
 use tracing::instrument;
 use uuid::Uuid;
 
-#[get("/activities/{id}")]
+#[get("/{id}")]
 #[instrument]
 pub async fn get_activity(
 	state: web::Data<AppState>,
