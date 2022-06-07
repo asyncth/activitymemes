@@ -31,7 +31,7 @@ use uuid::Uuid;
 
 #[instrument]
 pub async fn post_to_outbox(
-	state: &AppState,
+	state: web::Data<AppState>,
 	user_id: Uuid,
 	username: &str,
 	body: web::Json<ObjectBox>,
@@ -40,7 +40,7 @@ pub async fn post_to_outbox(
 		// Activities
 		body if body.is_kind(CreateType) => {
 			let body: Create = body.to_owned().into_concrete().unwrap();
-			create::post_create(state, body, user_id, username).await?
+			create::post_create(&state, body, user_id, username).await?
 		}
 		body if body.is_kind(AcceptType) => todo!("AcceptType"),
 		body if body.is_kind(DeleteType) => todo!("DeleteType"),

@@ -128,5 +128,5 @@ pub async fn post_outbox(
 		None => return Err(ApiError::NotSignedIn),
 	}
 
-	outbox::post_to_outbox(&state, user_id, &username, body).await
+	outbox::post_to_outbox(state, user_id, &username, body).await
 }

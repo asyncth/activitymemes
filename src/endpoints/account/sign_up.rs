@@ -28,7 +28,7 @@ use sqlx::Row;
 use tracing::instrument;
 use uuid::Uuid;
 
-static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_-]*$").unwrap());
+static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap());
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct PostSignUpBody {
