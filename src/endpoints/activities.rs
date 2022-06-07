@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
 use crate::error::ApiError;
 use crate::{account, AppState};
 use actix_web::{get, web, HttpRequest};
 use serde_json::Value as JsonValue;
 use sqlx::Row;
+use std::collections::HashMap;
 use tracing::instrument;
 use uuid::Uuid;
 
