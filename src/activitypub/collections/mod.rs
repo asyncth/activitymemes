@@ -17,6 +17,9 @@ pub mod followers;
 pub mod following;
 pub mod inbox;
 pub mod outbox;
+pub mod stream;
+
+pub use stream::Stream;
 
 use crate::error::ApiError;
 use activitystreams::collection::properties::{CollectionPageProperties, CollectionProperties};
@@ -31,14 +34,20 @@ use tracing::{error, instrument};
 
 #[derive(Clone, Debug)]
 pub struct ItemBaseBox {
-	id: i64,
-	data: BaseBox,
+	pub id: i64,
+	pub data: BaseBox,
 }
 
 #[derive(Clone, Debug)]
 pub struct ItemXsdString {
-	id: i64,
-	data: String,
+	pub id: i64,
+	pub data: String,
+}
+
+#[derive(Clone, Debug)]
+pub enum Item {
+	BaseBox(ItemBaseBox),
+	XsdString(ItemXsdString),
 }
 
 #[derive(Clone, Debug)]
@@ -93,6 +102,7 @@ pub trait Provider {
 pub struct Collection<T>
 where
 	T: Provider + Debug,
+	<T as Provider>::Data: Debug,
 {
 	provider: T,
 }
@@ -104,6 +114,10 @@ where
 {
 	pub fn new(provider: T) -> Self {
 		Self { provider }
+	}
+
+	pub fn stream<'a>(&'a self, data: &'a <T as Provider>::Data) -> Stream<'a, T> {
+		Stream::new(&self.provider, data)
 	}
 
 	#[instrument]
