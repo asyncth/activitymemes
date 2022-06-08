@@ -14,6 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 mod create;
+mod follow;
 mod image;
 mod object;
 mod utils;
@@ -23,7 +24,7 @@ use crate::state::AppState;
 use activitystreams::activity::kind::{
 	AcceptType, CreateType, DeleteType, FollowType, LikeType, RemoveType, UpdateType,
 };
-use activitystreams::activity::Create;
+use activitystreams::activity::{Create, Follow};
 use activitystreams::object::kind::{ImageType, NoteType};
 use activitystreams::object::{Image, ObjectBox};
 use actix_web::{web, HttpResponse};
@@ -45,7 +46,10 @@ pub async fn post_to_outbox(
 		}
 		body if body.is_kind(AcceptType) => todo!("AcceptType"),
 		body if body.is_kind(DeleteType) => todo!("DeleteType"),
-		body if body.is_kind(FollowType) => todo!("FollowType"),
+		body if body.is_kind(FollowType) => {
+			let body: Follow = body.to_owned().into_concrete().unwrap();
+			follow::post_follow(state, body, user_id, username).await?
+		}
 		body if body.is_kind(LikeType) => todo!("LikeType"),
 		body if body.is_kind(RemoveType) => todo!("RemoveType"),
 		body if body.is_kind(UpdateType) => todo!("UpdateType"),

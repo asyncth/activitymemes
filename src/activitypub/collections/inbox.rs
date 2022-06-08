@@ -67,7 +67,7 @@ impl Provider for Inbox {
 
 	async fn total_items(&self, data: &Self::Data) -> Result<u64, Self::Error> {
 		const FOLLOWING_QUERY: &str = "
-			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1)
+			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1 AND pending = FALSE)
 		";
 
 		const MAIN_QUERY: &str = "
@@ -98,7 +98,7 @@ impl Provider for Inbox {
 
 	async fn fetch_first_page(&self, data: &Self::Data) -> Result<Items, Self::Error> {
 		const FOLLOWING_QUERY: &str = "
-			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1)
+			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1 AND pending = FALSE)
 		";
 
 		const MAIN_QUERY: &str = "
@@ -135,7 +135,7 @@ impl Provider for Inbox {
 			NaiveDateTime::from_timestamp(max_id / 1000, u32::try_from((max_id % 1000) * 1000000)?);
 
 		const FOLLOWING_QUERY: &str = "
-			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1)
+			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1 AND pending = FALSE)
 		";
 
 		const MAIN_QUERY: &str = "
@@ -174,7 +174,7 @@ impl Provider for Inbox {
 			NaiveDateTime::from_timestamp(min_id / 1000, u32::try_from((min_id % 1000) * 1000000)?);
 
 		const FOLLOWING_QUERY: &str = "
-			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1)
+			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1 AND pending = FALSE)
 		";
 
 		const MAIN_QUERY: &str = "
