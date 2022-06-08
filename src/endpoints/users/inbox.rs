@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::account;
 use crate::activitypub::collections::inbox::{Data, Inbox};
 use crate::activitypub::collections::Collection;
 use crate::error::ApiError;
 use crate::state::AppState;
 use activitystreams::collection::{OrderedCollection, OrderedCollectionPage};
-use actix_web::{get, post, web, Either, HttpResponse};
+use actix_web::{get, post, web, Either, HttpRequest, HttpResponse};
 use serde::Deserialize;
 use sqlx::Row;
 use tracing::instrument;
@@ -38,6 +39,7 @@ pub async fn get_inbox(
 	state: web::Data<AppState>,
 	path: web::Path<String>,
 	query: web::Query<GetInboxQuery>,
+	req: HttpRequest,
 ) -> Result<Either<web::Json<OrderedCollection>, web::Json<OrderedCollectionPage>>, ApiError> {
 	let username = path.into_inner();
 
@@ -51,6 +53,12 @@ pub async fn get_inbox(
 		return Err(ApiError::UserDoesNotExist);
 	}
 	let user_id = user_id.unwrap();
+
+	match account::ensure_signed_in(&state, &req) {
+		Some(session_username) if username == session_username => (),
+		Some(_) => return Err(ApiError::Forbidden),
+		None => return Err(ApiError::NotSignedIn),
+	}
 
 	let collection = Collection::new(Inbox::new(state.clone()));
 	let data = Data { user_id, username };
