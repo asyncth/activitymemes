@@ -38,7 +38,6 @@ pub enum ApiError {
 	NotSignedIn,
 	Forbidden,
 	ResourceNotFound,
-	RecursionLimitReached,
 	OtherBadRequest,
 }
 
@@ -59,7 +58,6 @@ impl fmt::Display for ApiError {
 			Self::NotSignedIn => write!(f, "Not signed in."),
 			Self::Forbidden => write!(f, "Forbidden."),
 			Self::ResourceNotFound => write!(f, "Resource not found."),
-			Self::RecursionLimitReached => write!(f, "Reached recursion limit."),
 			Self::OtherBadRequest => write!(f, "Bad request."),
 		}
 	}

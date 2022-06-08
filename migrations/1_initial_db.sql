@@ -20,7 +20,9 @@ CREATE TABLE activities (
 	activity jsonb NOT NULL,
 	is_public boolean NOT NULL,
 	to_mentions uuid[] NOT NULL,
-	cc_mentions uuid[] NOT NULL
+	cc_mentions uuid[] NOT NULL,
+	to_followers_of uuid[] NOT NULL,
+	cc_followers_of uuid[] NOT NULL
 );
 
 CREATE TABLE follows (

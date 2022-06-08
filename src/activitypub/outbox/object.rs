@@ -18,13 +18,10 @@ use activitystreams::activity::properties::CreateProperties;
 use activitystreams::activity::Create;
 use activitystreams::object::properties::ObjectProperties;
 use activitystreams::object::Object;
-use activitystreams::primitives::XsdAnyUri;
 use activitystreams::BaseBox;
 use chrono::{DateTime, FixedOffset, Utc};
-use std::str::FromStr;
 
-/// Maximum number of `to` and `cc` mentions that aren't public addressing.
-pub const MAX_NON_PUBLIC_CC_AND_TO: usize = 5;
+use super::utils::limit_to_and_cc;
 
 pub struct UnsanitizedObject<T>
 where
@@ -105,22 +102,7 @@ where
 		}
 
 		let to = match object_props.get_many_to_xsd_any_uris() {
-			Some(i) => {
-				let v: Vec<XsdAnyUri> = i.cloned().collect();
-				let public_addressing =
-					XsdAnyUri::from_str("https://www.w3.org/ns/activitystreams#Public")?;
-
-				let contains_public_addressing_before_take = v.contains(&public_addressing);
-				let mut v: Vec<XsdAnyUri> = v.into_iter().take(MAX_NON_PUBLIC_CC_AND_TO).collect();
-				let contains_public_addressing_after_take = v.contains(&public_addressing);
-
-				if contains_public_addressing_before_take && !contains_public_addressing_after_take
-				{
-					v.push(public_addressing);
-				}
-
-				v
-			}
+			Some(i) => limit_to_and_cc(i)?,
 			None => match object_props.get_to_xsd_any_uri() {
 				Some(one) => vec![one.clone()],
 				None => Vec::new(),
@@ -128,22 +110,7 @@ where
 		};
 
 		let cc = match object_props.get_many_cc_xsd_any_uris() {
-			Some(i) => {
-				let v: Vec<XsdAnyUri> = i.cloned().collect();
-				let public_addressing =
-					XsdAnyUri::from_str("https://www.w3.org/ns/activitystreams#Public")?;
-
-				let contains_public_addressing_before_take = v.contains(&public_addressing);
-				let mut v: Vec<XsdAnyUri> = v.into_iter().take(MAX_NON_PUBLIC_CC_AND_TO).collect();
-				let contains_public_addressing_after_take = v.contains(&public_addressing);
-
-				if contains_public_addressing_before_take && !contains_public_addressing_after_take
-				{
-					v.push(public_addressing);
-				}
-
-				v
-			}
+			Some(i) => limit_to_and_cc(i)?,
 			None => match object_props.get_cc_xsd_any_uri() {
 				Some(one) => vec![one.clone()],
 				None => Vec::new(),

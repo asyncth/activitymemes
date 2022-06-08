@@ -66,21 +66,61 @@ impl Provider for Inbox {
 	}
 
 	async fn total_items(&self, data: &Self::Data) -> Result<u64, Self::Error> {
-		let total_items: i64 = sqlx::query(
-			"SELECT COUNT(1) FROM activities WHERE $1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)",
-		)
-		.bind(data.user_id)
-		.fetch_one(&self.state.db)
-		.await?
-		.get(0);
+		const FOLLOWING_QUERY: &str = "
+			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1)
+		";
+
+		const MAIN_QUERY: &str = "
+			SELECT COUNT(1)
+			FROM activities
+			WHERE ($1 = ANY(to_mentions))
+			OR ($1 = ANY(cc_mentions))
+			OR (to_followers_of && $2)
+			OR (cc_followers_of && $2)
+		";
+
+		let following: Vec<Uuid> = sqlx::query(FOLLOWING_QUERY)
+			.bind(data.user_id)
+			.fetch_one(&self.state.db)
+			.await?
+			.get(0);
+
+		let total_items: i64 = sqlx::query(MAIN_QUERY)
+			.bind(data.user_id)
+			.bind(following)
+			.fetch_one(&self.state.db)
+			.await?
+			.get(0);
 
 		let total_items = u64::try_from(total_items).expect("expected count to be zero or more");
 		Ok(total_items)
 	}
 
 	async fn fetch_first_page(&self, data: &Self::Data) -> Result<Items, Self::Error> {
-		let items: Result<Vec<ItemBaseBox>, ApiError> = sqlx::query("SELECT published_at, activity FROM activities WHERE $1 = ANY(to_mentions) OR $1 = ANY(cc_mentions) ORDER BY published_at DESC LIMIT 20")
+		const FOLLOWING_QUERY: &str = "
+			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1)
+		";
+
+		const MAIN_QUERY: &str = "
+			SELECT published_at, activity
+			FROM activities
+			WHERE ($1 = ANY(to_mentions))
+			OR ($1 = ANY(cc_mentions))
+			OR (to_followers_of && $2)
+			OR (cc_followers_of && $2)
+			ORDER BY published_at DESC
+			LIMIT 20
+		";
+
+		let following: Vec<Uuid> = sqlx::query(FOLLOWING_QUERY)
 			.bind(data.user_id)
+			.fetch_one(&self.state.db)
+			.await?
+			.get(0);
+
+		let items: Result<Vec<ItemBaseBox>, ApiError> = sqlx::query(MAIN_QUERY)
+			.bind(data.user_id)
+			.bind(following)
 			.map(|row| self.query_to_item(row))
 			.fetch_all(&self.state.db)
 			.await?
@@ -93,8 +133,32 @@ impl Provider for Inbox {
 	async fn fetch_max_id(&self, max_id: i64, data: &Self::Data) -> Result<Items, Self::Error> {
 		let max_id =
 			NaiveDateTime::from_timestamp(max_id / 1000, u32::try_from((max_id % 1000) * 1000000)?);
-		let items: Result<Vec<ItemBaseBox>, ApiError> = sqlx::query("SELECT published_at, activity FROM activities WHERE ($1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)) AND published_at < $2 ORDER BY published_at DESC LIMIT 20")
+
+		const FOLLOWING_QUERY: &str = "
+			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1)
+		";
+
+		const MAIN_QUERY: &str = "
+			SELECT published_at, activity
+			FROM activities
+			WHERE (($1 = ANY(to_mentions))
+			OR ($1 = ANY(cc_mentions))
+			OR (to_followers_of && $2)
+			OR (cc_followers_of && $2))
+			AND published_at < $3
+			ORDER BY published_at DESC
+			LIMIT 20
+		";
+
+		let following: Vec<Uuid> = sqlx::query(FOLLOWING_QUERY)
 			.bind(data.user_id)
+			.fetch_one(&self.state.db)
+			.await?
+			.get(0);
+
+		let items: Result<Vec<ItemBaseBox>, ApiError> = sqlx::query(MAIN_QUERY)
+			.bind(data.user_id)
+			.bind(following)
 			.bind(max_id)
 			.map(|row| self.query_to_item(row))
 			.fetch_all(&self.state.db)
@@ -108,8 +172,36 @@ impl Provider for Inbox {
 	async fn fetch_min_id(&self, min_id: i64, data: &Self::Data) -> Result<Items, Self::Error> {
 		let min_id =
 			NaiveDateTime::from_timestamp(min_id / 1000, u32::try_from((min_id % 1000) * 1000000)?);
-		let items: Result<Vec<ItemBaseBox>, ApiError> = sqlx::query("SELECT * FROM (SELECT published_at, activity FROM activities WHERE ($1 = ANY(to_mentions) OR $1 = ANY(cc_mentions)) AND published_at > $2 ORDER BY published_at ASC LIMIT 20) AS tmp ORDER BY published_at DESC")
+
+		const FOLLOWING_QUERY: &str = "
+			SELECT ARRAY(SELECT object_user_id FROM follows WHERE subject_user_id = $1)
+		";
+
+		const MAIN_QUERY: &str = "
+			SELECT *
+			FROM
+			(SELECT published_at, activity
+			FROM activities
+			WHERE (($1 = ANY(to_mentions))
+			OR ($1 = ANY(cc_mentions))
+			OR (to_followers_of && $2)
+			OR (cc_followers_of && $2))
+			AND published_at > $3
+			ORDER BY published_at ASC
+			LIMIT 20)
+			AS tmp
+			ORDER BY published_at DESC
+		";
+
+		let following: Vec<Uuid> = sqlx::query(FOLLOWING_QUERY)
 			.bind(data.user_id)
+			.fetch_one(&self.state.db)
+			.await?
+			.get(0);
+
+		let items: Result<Vec<ItemBaseBox>, ApiError> = sqlx::query(MAIN_QUERY)
+			.bind(data.user_id)
+			.bind(following)
 			.bind(min_id)
 			.map(|row| self.query_to_item(row))
 			.fetch_all(&self.state.db)

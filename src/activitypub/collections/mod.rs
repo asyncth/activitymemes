@@ -116,6 +116,7 @@ where
 		Self { provider }
 	}
 
+	#[allow(dead_code)]
 	pub fn stream<'a>(&'a self, data: &'a <T as Provider>::Data) -> Stream<'a, T> {
 		Stream::new(&self.provider, data)
 	}
