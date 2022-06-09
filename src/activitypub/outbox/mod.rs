@@ -16,8 +16,6 @@
 mod create;
 mod follow;
 mod image;
-mod object;
-mod utils;
 
 use crate::error::ApiError;
 use crate::state::AppState;

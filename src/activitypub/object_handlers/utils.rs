@@ -20,6 +20,7 @@ use activitystreams::primitives::XsdAnyUri;
 use actix_web::web;
 use futures::future;
 use sqlx::Row;
+use std::collections::HashSet;
 use std::str::FromStr;
 use tracing::instrument;
 use uuid::Uuid;
@@ -122,11 +123,15 @@ pub fn limit_to_and_cc<'a, I>(iter: I) -> Result<Vec<XsdAnyUri>, ApiError>
 where
 	I: IntoIterator<Item = &'a XsdAnyUri>,
 {
-	let v: Vec<XsdAnyUri> = iter.into_iter().cloned().collect();
+	let v: Vec<&XsdAnyUri> = iter.into_iter().collect();
 	let public_addressing = XsdAnyUri::from_str("https://www.w3.org/ns/activitystreams#Public")?;
 
-	let contains_public_addressing_before_take = v.contains(&public_addressing);
-	let mut v: Vec<XsdAnyUri> = v.into_iter().take(MAX_NON_PUBLIC_CC_AND_TO).collect();
+	let contains_public_addressing_before_take = v.contains(&&public_addressing);
+	let mut v: Vec<XsdAnyUri> = v
+		.into_iter()
+		.take(MAX_NON_PUBLIC_CC_AND_TO)
+		.cloned()
+		.collect();
 	let contains_public_addressing_after_take = v.contains(&public_addressing);
 
 	if contains_public_addressing_before_take && !contains_public_addressing_after_take {
@@ -134,4 +139,38 @@ where
 	}
 
 	Ok(v)
+}
+
+pub fn merge_and_limit_mentions<'a, T>(
+	object_to: T,
+	object_cc: T,
+	activity_to: T,
+	activity_cc: T,
+) -> Result<(Vec<XsdAnyUri>, Vec<XsdAnyUri>), ApiError>
+where
+	T: IntoIterator<Item = &'a XsdAnyUri>,
+{
+	let mut to_deduplicated = HashSet::new();
+	let mut cc_deduplicated = HashSet::new();
+
+	for uri in object_to {
+		to_deduplicated.insert(uri);
+	}
+
+	for uri in object_cc {
+		cc_deduplicated.insert(uri);
+	}
+
+	for uri in activity_to {
+		to_deduplicated.insert(uri);
+	}
+
+	for uri in activity_cc {
+		cc_deduplicated.insert(uri);
+	}
+
+	let to = limit_to_and_cc(to_deduplicated.into_iter())?;
+	let cc = limit_to_and_cc(cc_deduplicated.into_iter())?;
+
+	Ok((to, cc))
 }

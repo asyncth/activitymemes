@@ -13,16 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::activitypub::object_handlers;
 use crate::error::ApiError;
 use crate::state::AppState;
 use crate::url;
 use activitystreams::activity::Follow;
-use activitystreams::{
-	activity::properties::FollowProperties, object::properties::ObjectProperties,
-};
 use actix_web::http::header;
 use actix_web::{web, HttpResponse};
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::Utc;
 use sqlx::Row;
 use tracing::instrument;
 use uuid::Uuid;
@@ -34,24 +32,15 @@ pub async fn post_follow(
 	subject_user_id: Uuid,
 	username: &str,
 ) -> Result<HttpResponse, ApiError> {
-	let follow_props: &FollowProperties = body.as_ref();
-	let actor_url = follow_props
-		.get_actor_xsd_any_uri()
-		.ok_or(ApiError::OtherBadRequest)?;
+	let actor_url =
+		object_handlers::get_actor_xsd_any_uri(&body).ok_or(ApiError::OtherBadRequest)?;
 
-	if let Some(captures) = url::user_url_regex().captures(actor_url.as_str()) {
-		let captured_username = captures.get(1).unwrap().as_str();
-		if captured_username != username {
-			return Err(ApiError::OtherBadRequest);
-		}
-	} else {
+	if url::activitypub_actor(username) != actor_url.as_str() {
 		return Err(ApiError::OtherBadRequest);
 	}
 
-	let object_url = follow_props
-		.get_object_xsd_any_uri()
-		.ok_or(ApiError::OtherBadRequest)?;
-
+	let object_url =
+		object_handlers::get_object_xsd_any_uri(&body).ok_or(ApiError::OtherBadRequest)?;
 	if let Some(captures) = url::user_url_regex().captures(object_url.as_str()) {
 		let captured_username = captures.get(1).unwrap().as_str();
 
@@ -68,25 +57,18 @@ pub async fn post_follow(
 
 		let activity_id = Uuid::new_v4();
 		let published_at = Utc::now();
-		let published_at_fixed: DateTime<FixedOffset> = published_at.into();
 
-		let mut new_activity = Follow::new();
-		let object_props: &mut ObjectProperties = new_activity.as_mut();
-
-		object_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
-		object_props.set_id(url::activitypub_activity(activity_id))?;
-		object_props.set_published(published_at_fixed)?;
-		object_props
-			.set_many_cc_xsd_any_uris(vec!["https://www.w3.org/ns/activitystreams#Public"])?;
-
-		let follow_props: &mut FollowProperties = new_activity.as_mut();
-
-		follow_props.set_actor_xsd_any_uri(url::activitypub_actor(username))?;
-		follow_props.set_object_xsd_any_uri(url::activitypub_actor(captured_username))?;
+		let new_follow = object_handlers::new_follow(
+			activity_id,
+			published_at,
+			actor_url.clone(),
+			object_url.clone(),
+			Vec::new(),
+			Vec::new(),
+		)?;
 
 		let empty_vec: Vec<Uuid> = Vec::new();
-
-		let serialized_activity = serde_json::to_value(new_activity)?;
+		let serialized_activity = serde_json::to_value(new_follow)?;
 
 		let mut tx = state.db.begin().await?;
 

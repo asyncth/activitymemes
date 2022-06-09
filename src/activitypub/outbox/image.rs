@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use super::utils;
-use crate::activitypub::outbox::object::UnsanitizedObject;
+use crate::activitypub::object_handlers::{self, utils};
 use crate::error::ApiError;
 use crate::state::AppState;
 use crate::url;
 use activitystreams::object::Image;
+use activitystreams::primitives::XsdAnyUri;
 use actix_web::http::header;
 use actix_web::web;
 use actix_web::HttpResponse;
+use chrono::Utc;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -32,37 +33,49 @@ pub async fn post_image(
 	user_id: Uuid,
 	username: &str,
 ) -> Result<HttpResponse, ApiError> {
-	let id = Uuid::new_v4();
-	let activity_url = url::activitypub_activity(id);
-	let object_url = url::activitypub_object(id);
-	let actor_url = url::activitypub_actor(username);
+	let activity_id = Uuid::new_v4();
+	let activity_url = url::activitypub_activity(activity_id);
+	let actor_url = XsdAnyUri::try_from(url::activitypub_actor(username))?;
 
-	let image = UnsanitizedObject::new(body).sanitize(&object_url, Some(&actor_url))?;
-	let activity = image.activity(&activity_url, &actor_url)?;
+	let name = object_handlers::get_name(&body).ok_or(ApiError::OtherBadRequest)?;
+	let summary = object_handlers::get_summary(&body).ok_or(ApiError::OtherBadRequest)?;
+	let image_url = object_handlers::get_url(&body).ok_or(ApiError::OtherBadRequest)?;
 
-	let published_at = activity
-		.object_props
-		.get_published()
-		.unwrap()
-		.as_datetime()
-		.naive_utc();
+	let to = object_handlers::get_to(&body).ok_or(ApiError::OtherBadRequest)?;
+	let cc = object_handlers::get_cc(&body).ok_or(ApiError::OtherBadRequest)?;
 
-	let to = utils::actor_urls_to_uuids(
-		state.clone(),
-		activity.object_props.get_many_to_xsd_any_uris().unwrap(),
-	)
-	.await?;
-	let cc = utils::actor_urls_to_uuids(
-		state.clone(),
-		activity.object_props.get_many_cc_xsd_any_uris().unwrap(),
-	)
-	.await?;
+	let to = utils::limit_to_and_cc(to.into_iter())?;
+	let cc = utils::limit_to_and_cc(cc.into_iter())?;
+
+	let published_at = Utc::now();
+	let new_image = object_handlers::new_image(
+		activity_id,
+		actor_url.clone(),
+		name,
+		summary,
+		image_url.clone(),
+		published_at,
+		to.clone(),
+		cc.clone(),
+	)?;
+
+	let activity = object_handlers::new_create(
+		activity_id,
+		actor_url,
+		published_at,
+		new_image.try_into()?,
+		to.clone(),
+		cc.clone(),
+	)?;
+
+	let to = utils::actor_urls_to_uuids(state.clone(), to.iter()).await?;
+	let cc = utils::actor_urls_to_uuids(state.clone(), cc.iter()).await?;
 
 	let is_public = to.has_public_uri || cc.has_public_uri;
 
 	let serialized_activity = serde_json::to_value(activity)?;
 	sqlx::query("INSERT INTO activities (id, user_id, this_instance, published_at, activity, is_public, to_mentions, cc_mentions, to_followers_of, cc_followers_of) VALUES ($1, $2, TRUE, $3, $4, $5, $6, $7, $8, $9)")
-		.bind(id)
+		.bind(activity_id)
 		.bind(user_id)
 		.bind(published_at)
 		.bind(serialized_activity)
