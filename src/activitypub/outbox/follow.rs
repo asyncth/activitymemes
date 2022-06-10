@@ -63,8 +63,6 @@ pub async fn post_follow(
 			published_at,
 			actor_url.clone(),
 			object_url.clone(),
-			Vec::new(),
-			Vec::new(),
 		)?;
 
 		let empty_vec: Vec<Uuid> = Vec::new();

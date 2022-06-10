@@ -23,6 +23,7 @@ use activitystreams::object::Image;
 use activitystreams::primitives::XsdAnyUri;
 use activitystreams::BaseBox;
 use chrono::{DateTime, FixedOffset, Utc};
+use std::str::FromStr;
 use uuid::Uuid;
 
 // TODO: Move common activity args into a separate struct and use that instead.
@@ -31,11 +32,11 @@ pub fn new_image(
 	activity_id: Uuid,
 	actor_url: XsdAnyUri,
 	name: &str,
-	summary: &str,
+	summary: Option<&str>,
 	image_url: XsdAnyUri,
 	published_at: DateTime<Utc>,
-	to: Vec<XsdAnyUri>,
-	cc: Vec<XsdAnyUri>,
+	to: Option<Vec<XsdAnyUri>>,
+	cc: Option<Vec<XsdAnyUri>>,
 ) -> Result<Image, ApiError> {
 	let mut image = Image::new();
 	let object_props: &mut ObjectProperties = image.as_mut();
@@ -43,12 +44,41 @@ pub fn new_image(
 	object_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 	object_props.set_id(url::activitypub_object(activity_id))?;
 	object_props.set_name_xsd_string(name.trim())?;
-	object_props.set_summary_xsd_string(summary.trim())?;
 	object_props.set_url_xsd_any_uri(image_url)?;
 	object_props.set_attributed_to_xsd_any_uri(actor_url)?;
 	object_props.set_published(DateTime::<FixedOffset>::from(published_at))?;
-	object_props.set_many_to_xsd_any_uris(to)?;
-	object_props.set_many_cc_xsd_any_uris(cc)?;
+
+	if let Some(summary) = summary {
+		object_props.set_summary_xsd_string(summary.trim())?;
+	}
+
+	if to.is_none() && cc.is_none() {
+		return Err(ApiError::OtherBadRequest);
+	} else if to.is_some() && cc.is_none() {
+		let to = to.unwrap();
+		if to.is_empty() {
+			return Err(ApiError::OtherBadRequest);
+		}
+
+		object_props.set_many_to_xsd_any_uris(to)?;
+	} else if to.is_none() && cc.is_some() {
+		let cc = cc.unwrap();
+		if cc.is_empty() {
+			return Err(ApiError::OtherBadRequest);
+		}
+
+		object_props.set_many_cc_xsd_any_uris(cc)?;
+	} else {
+		let to = to.unwrap();
+		let cc = cc.unwrap();
+
+		if to.is_empty() && cc.is_empty() {
+			return Err(ApiError::OtherBadRequest);
+		}
+
+		object_props.set_many_to_xsd_any_uris(to)?;
+		object_props.set_many_cc_xsd_any_uris(cc)?;
+	}
 
 	Ok(image)
 }
@@ -58,8 +88,8 @@ pub fn new_create(
 	actor_url: XsdAnyUri,
 	published_at: DateTime<Utc>,
 	inner_object: BaseBox,
-	to: Vec<XsdAnyUri>,
-	cc: Vec<XsdAnyUri>,
+	to: Option<Vec<XsdAnyUri>>,
+	cc: Option<Vec<XsdAnyUri>>,
 ) -> Result<Create, ApiError> {
 	let mut create = Create::new();
 	let object_props: &mut ObjectProperties = create.as_mut();
@@ -67,8 +97,34 @@ pub fn new_create(
 	object_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 	object_props.set_id(url::activitypub_activity(activity_id))?;
 	object_props.set_published(DateTime::<FixedOffset>::from(published_at))?;
-	object_props.set_many_to_xsd_any_uris(to)?;
-	object_props.set_many_cc_xsd_any_uris(cc)?;
+
+	if to.is_none() && cc.is_none() {
+		return Err(ApiError::OtherBadRequest);
+	} else if to.is_some() && cc.is_none() {
+		let to = to.unwrap();
+		if to.is_empty() {
+			return Err(ApiError::OtherBadRequest);
+		}
+
+		object_props.set_many_to_xsd_any_uris(to)?;
+	} else if to.is_none() && cc.is_some() {
+		let cc = cc.unwrap();
+		if cc.is_empty() {
+			return Err(ApiError::OtherBadRequest);
+		}
+
+		object_props.set_many_cc_xsd_any_uris(cc)?;
+	} else {
+		let to = to.unwrap();
+		let cc = cc.unwrap();
+
+		if to.is_empty() && cc.is_empty() {
+			return Err(ApiError::OtherBadRequest);
+		}
+
+		object_props.set_many_to_xsd_any_uris(to)?;
+		object_props.set_many_cc_xsd_any_uris(cc)?;
+	}
 
 	let create_props: &mut CreateProperties = create.as_mut();
 
@@ -83,8 +139,6 @@ pub fn new_follow(
 	published_at: DateTime<Utc>,
 	actor_url: XsdAnyUri,
 	object_url: XsdAnyUri,
-	to: Vec<XsdAnyUri>,
-	cc: Vec<XsdAnyUri>,
 ) -> Result<Follow, ApiError> {
 	let mut follow = Follow::new();
 	let object_props: &mut ObjectProperties = follow.as_mut();
@@ -92,8 +146,10 @@ pub fn new_follow(
 	object_props.set_context_xsd_any_uri("https://www.w3.org/ns/activitystreams")?;
 	object_props.set_id(url::activitypub_activity(activity_id))?;
 	object_props.set_published(DateTime::<FixedOffset>::from(published_at))?;
-	object_props.set_many_to_xsd_any_uris(to)?;
-	object_props.set_many_cc_xsd_any_uris(cc)?;
+	object_props.set_many_to_xsd_any_uris(Vec::<XsdAnyUri>::new())?;
+	object_props.set_many_cc_xsd_any_uris(vec![XsdAnyUri::from_str(
+		"https://www.w3.org/ns/activitystreams#Public",
+	)?])?;
 
 	let actor_and_object_props: &mut ActorAndObjectProperties = follow.as_mut();
 

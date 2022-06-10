@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::activitypub::object_handlers::{self, utils};
+use crate::activitypub::object_handlers;
+use crate::activitypub::object_handlers::utils::{self, ToCcUuids};
 use crate::error::ApiError;
 use crate::state::AppState;
 use crate::url;
@@ -38,14 +39,23 @@ pub async fn post_image(
 	let actor_url = XsdAnyUri::try_from(url::activitypub_actor(username))?;
 
 	let name = object_handlers::get_name(&body).ok_or(ApiError::OtherBadRequest)?;
-	let summary = object_handlers::get_summary(&body).ok_or(ApiError::OtherBadRequest)?;
+	let summary = object_handlers::get_summary(&body);
 	let image_url = object_handlers::get_url(&body).ok_or(ApiError::OtherBadRequest)?;
 
-	let to = object_handlers::get_to(&body).ok_or(ApiError::OtherBadRequest)?;
-	let cc = object_handlers::get_cc(&body).ok_or(ApiError::OtherBadRequest)?;
+	let to = object_handlers::get_to(&body);
+	let cc = object_handlers::get_cc(&body);
 
-	let to = utils::limit_to_and_cc(to.into_iter())?;
-	let cc = utils::limit_to_and_cc(cc.into_iter())?;
+	let to = if let Some(to) = to {
+		Some(utils::limit_to_and_cc(to.into_iter())?)
+	} else {
+		None
+	};
+
+	let cc = if let Some(cc) = cc {
+		Some(utils::limit_to_and_cc(cc.into_iter())?)
+	} else {
+		None
+	};
 
 	let published_at = Utc::now();
 	let new_image = object_handlers::new_image(
@@ -68,10 +78,39 @@ pub async fn post_image(
 		cc.clone(),
 	)?;
 
-	let to = utils::actor_urls_to_uuids(state.clone(), to.iter()).await?;
-	let cc = utils::actor_urls_to_uuids(state.clone(), cc.iter()).await?;
+	let to = if let Some(to) = to {
+		Some(utils::actor_urls_to_uuids(state.clone(), to.iter()).await?)
+	} else {
+		None
+	};
 
-	let is_public = to.has_public_uri || cc.has_public_uri;
+	let cc = if let Some(cc) = cc {
+		Some(utils::actor_urls_to_uuids(state.clone(), cc.iter()).await?)
+	} else {
+		None
+	};
+
+	let (to, cc, is_public) = if to.is_some() && cc.is_some() {
+		let to = to.unwrap();
+		let cc = cc.unwrap();
+
+		let to_has_public_uri = to.has_public_uri;
+		let cc_has_public_uri = cc.has_public_uri;
+
+		(to, cc, to_has_public_uri && cc_has_public_uri)
+	} else if to.is_some() && cc.is_none() {
+		let to = to.unwrap();
+		let has_public_uri = to.has_public_uri;
+
+		(to, ToCcUuids::default(), has_public_uri)
+	} else if to.is_none() && cc.is_some() {
+		let cc = cc.unwrap();
+		let has_public_uri = cc.has_public_uri;
+
+		(ToCcUuids::default(), cc, has_public_uri)
+	} else {
+		unreachable!();
+	};
 
 	let serialized_activity = serde_json::to_value(activity)?;
 	sqlx::query("INSERT INTO activities (id, user_id, this_instance, published_at, activity, is_public, to_mentions, cc_mentions, to_followers_of, cc_followers_of) VALUES ($1, $2, TRUE, $3, $4, $5, $6, $7, $8, $9)")

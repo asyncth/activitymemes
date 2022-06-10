@@ -39,8 +39,8 @@ pub async fn post_create(
 	let activity_url = url::activitypub_activity(activity_id);
 	let actor_url = XsdAnyUri::try_from(url::activitypub_actor(username))?;
 
-	let activity_to = object_handlers::get_to(&body).ok_or(ApiError::OtherBadRequest)?;
-	let activity_cc = object_handlers::get_cc(&body).ok_or(ApiError::OtherBadRequest)?;
+	let activity_to = object_handlers::get_to(&body);
+	let activity_cc = object_handlers::get_cc(&body);
 	let inner_object =
 		object_handlers::get_object_base_box(&body).ok_or(ApiError::OtherBadRequest)?;
 
@@ -49,10 +49,15 @@ pub async fn post_create(
 	let (inner_object, to, cc) = if inner_object.is_kind(ImageType) {
 		let image: Image = inner_object.clone().into_concrete().unwrap();
 		let name = object_handlers::get_name(&image).ok_or(ApiError::OtherBadRequest)?;
-		let summary = object_handlers::get_summary(&image).ok_or(ApiError::OtherBadRequest)?;
+		let summary = object_handlers::get_summary(&image);
 		let url = object_handlers::get_url(&image).ok_or(ApiError::OtherBadRequest)?;
-		let object_to = object_handlers::get_to(&image).ok_or(ApiError::OtherBadRequest)?;
-		let object_cc = object_handlers::get_cc(&image).ok_or(ApiError::OtherBadRequest)?;
+		let object_to = object_handlers::get_to(&image);
+		let object_cc = object_handlers::get_cc(&image);
+
+		let object_to = object_to.unwrap_or_else(Vec::new);
+		let object_cc = object_cc.unwrap_or_else(Vec::new);
+		let activity_to = activity_to.unwrap_or_else(Vec::new);
+		let activity_cc = activity_cc.unwrap_or_else(Vec::new);
 
 		let (to, cc) = utils::merge_and_limit_mentions(
 			object_to.into_iter(),
@@ -67,8 +72,8 @@ pub async fn post_create(
 			summary,
 			url.clone(),
 			published_at,
-			to.clone(),
-			cc.clone(),
+			Some(to.clone()),
+			Some(cc.clone()),
 		)?;
 
 		(BaseBox::try_from(new_image)?, to, cc)
@@ -81,8 +86,8 @@ pub async fn post_create(
 		actor_url,
 		published_at,
 		inner_object,
-		to.clone(),
-		cc.clone(),
+		Some(to.clone()),
+		Some(cc.clone()),
 	)?;
 
 	let to = utils::actor_urls_to_uuids(state.clone(), to.iter()).await?;
