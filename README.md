@@ -20,7 +20,7 @@ two PEM files.
 {
     "scheme": "http",
     "domain": "localhost:8080",
-	"port": 8080,
+    "port": 8080,
     "db_connection_uri": "postgres://username:password@localhost:5432/db_name",
     "num_of_db_pool_connections": 8,
     "token_rsa_public_key_pem_filepath": "pub.pem",
