@@ -53,6 +53,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 		.expect("expected tracing::subscriber::set_global_default to succeed");
 
 	let config = Config::with_file("config.json")?;
+	let port = config.port;
 	let state = web::Data::new(AppState::new(config).await?);
 
 	// Run database migrations.
@@ -86,7 +87,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 					.service(endpoints::account::post_sign_out),
 			)
 	})
-	.bind("127.0.0.1:8080")?
+	.bind(("0.0.0.0", port))?
 	.run()
 	.await?;
 

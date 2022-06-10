@@ -23,6 +23,7 @@ use std::path::Path;
 pub struct Config {
 	pub scheme: String,
 	pub domain: String,
+	pub port: u16,
 	pub db_connection_uri: String,
 	pub num_of_db_pool_connections: u32,
 	pub token_rsa_public_key_pem_filepath: String,

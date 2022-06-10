@@ -20,6 +20,7 @@ two PEM files.
 {
     "scheme": "http",
     "domain": "localhost:8080",
+	"port": 8080,
     "db_connection_uri": "postgres://username:password@localhost:5432/db_name",
     "num_of_db_pool_connections": 8,
     "token_rsa_public_key_pem_filepath": "pub.pem",
@@ -30,8 +31,7 @@ two PEM files.
 PostgreSQL connection URI, replace values of
 `token_rsa_public_key_pem_filepath` and `token_rsa_private_key_pem_filepath`
 with filepaths to public and private key files respectively. Please note
-that values of `scheme` and `domain` fields currently should not be
-changed.
+that value of `scheme` field currently should not be changed.
 6. Start `./target/release/activitymemes`.
 
 In the future, much of this will be automated.
