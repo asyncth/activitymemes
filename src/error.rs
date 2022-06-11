@@ -14,8 +14,10 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use activitystreams::primitives::XsdAnyUriError;
+use actix_web::error::PayloadError;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
+use awc::error::SendRequestError;
 use jsonwebtoken::errors::Error as JwtError;
 use pbkdf2::password_hash::Error as Pbkdf2Error;
 use serde_json::{json, Error as SerdeJsonError};
@@ -23,6 +25,7 @@ use std::convert::Infallible;
 use std::fmt;
 use std::num::TryFromIntError;
 use tracing::error;
+use url::ParseError;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ApiError {
@@ -38,6 +41,8 @@ pub enum ApiError {
 	NotSignedIn,
 	Forbidden,
 	ResourceNotFound,
+	BadUrl,
+	UnexpectedResponseFromFederatedServer,
 	OtherBadRequest,
 }
 
@@ -58,6 +63,10 @@ impl fmt::Display for ApiError {
 			Self::NotSignedIn => write!(f, "Not signed in."),
 			Self::Forbidden => write!(f, "Forbidden."),
 			Self::ResourceNotFound => write!(f, "Resource not found."),
+			Self::BadUrl => write!(f, "Bad URL."),
+			Self::UnexpectedResponseFromFederatedServer => {
+				write!(f, "Incorrect reply from federated server.")
+			}
 			Self::OtherBadRequest => write!(f, "Bad request."),
 		}
 	}
@@ -123,6 +132,26 @@ impl From<SerdeJsonError> for ApiError {
 	fn from(err: SerdeJsonError) -> Self {
 		error!(?err, "JSON error");
 		Self::InternalServerError
+	}
+}
+
+impl From<SendRequestError> for ApiError {
+	fn from(err: SendRequestError) -> Self {
+		error!(?err, "Failed to send request");
+		Self::InternalServerError
+	}
+}
+
+impl From<PayloadError> for ApiError {
+	fn from(err: PayloadError) -> Self {
+		error!(?err, "Failed to get the body of a HTTP response");
+		Self::InternalServerError
+	}
+}
+
+impl From<ParseError> for ApiError {
+	fn from(_: ParseError) -> Self {
+		Self::BadUrl
 	}
 }
 

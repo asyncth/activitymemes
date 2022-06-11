@@ -15,7 +15,7 @@
 
 use crate::error::ApiError;
 use crate::state::AppState;
-use crate::url;
+use crate::{routines, url as crate_url};
 use activitystreams::primitives::XsdAnyUri;
 use actix_web::web;
 use futures::future;
@@ -23,6 +23,7 @@ use sqlx::Row;
 use std::collections::HashSet;
 use std::str::FromStr;
 use tracing::instrument;
+use url::Url;
 use uuid::Uuid;
 
 /// Maximum number of `to` and `cc` mentions that aren't public addressing.
@@ -83,7 +84,8 @@ async fn actor_url_to_uuid(state: web::Data<AppState>, url: &str) -> Result<ToCc
 		return Err(ApiError::InternalServerError);
 	}
 
-	if let Some(captures) = url::user_url_regex().captures(url) {
+	// If the URL points to a same-instance user.
+	if let Some(captures) = crate_url::user_url_regex().captures(url) {
 		let username = captures.get(1).unwrap().as_str();
 
 		let user_id: Option<Uuid> =
@@ -100,7 +102,8 @@ async fn actor_url_to_uuid(state: web::Data<AppState>, url: &str) -> Result<ToCc
 		return Ok(ToCcUuid::DirectMention(user_id));
 	}
 
-	if let Some(captures) = url::user_followers_url_regex().captures(url) {
+	// If the URL points to the followers collection of a same-instance user.
+	if let Some(captures) = crate_url::user_followers_url_regex().captures(url) {
 		let username = captures.get(1).unwrap().as_str().to_string();
 		let user_id: Option<Uuid> =
 			sqlx::query("SELECT id FROM users WHERE username = $1 AND this_instance = TRUE")
@@ -116,7 +119,18 @@ async fn actor_url_to_uuid(state: web::Data<AppState>, url: &str) -> Result<ToCc
 		return Ok(ToCcUuid::MentionOfFollowersOf(user_id));
 	}
 
-	todo!("discovering foreign users");
+	// If the URL points to neither, see if it has our domain.
+	let url = Url::parse(url)?;
+	if let Some(domain) = url.domain() {
+		if domain == state.domain {
+			return Err(ApiError::OtherBadRequest);
+		}
+	}
+
+	// If not, try to fetch it from the database if it's saved there already
+	// or fetch it from the URL.
+	let user_id = routines::fetch_remote_actor(&state, url).await?;
+	Ok(ToCcUuid::DirectMention(user_id))
 }
 
 pub fn limit_to_and_cc<'a, I>(iter: I) -> Result<Vec<XsdAnyUri>, ApiError>

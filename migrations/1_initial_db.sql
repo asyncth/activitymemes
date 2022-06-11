@@ -1,15 +1,16 @@
 CREATE TABLE users (
 	id uuid PRIMARY KEY,
-	username text NOT NULL UNIQUE,
+	username text NOT NULL,
 	this_instance boolean NOT NULL,
 	instance_url text,
 	email text,
 	password text,
-	name text NOT NULL,
+	name text,
 	bio text,
 	profile_picture_id text
 );
 
+CREATE INDEX users_username_idx ON users (username);
 CREATE INDEX users_instance_url_idx ON users (instance_url);
 
 CREATE TABLE activities (
