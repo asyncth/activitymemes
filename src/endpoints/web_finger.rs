@@ -41,7 +41,7 @@ pub struct GetWebFingerQuery {
 }
 
 #[get("/.well-known/webfinger")]
-#[instrument]
+#[instrument(skip(state))]
 pub async fn get_web_finger(
 	state: web::Data<AppState>,
 	query: web::Query<GetWebFingerQuery>,

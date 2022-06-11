@@ -27,7 +27,7 @@ use chrono::Utc;
 use tracing::instrument;
 use uuid::Uuid;
 
-#[instrument]
+#[instrument(skip(state, username))]
 pub async fn post_image(
 	state: web::Data<AppState>,
 	body: Image,

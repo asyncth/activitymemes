@@ -33,7 +33,7 @@ pub struct GetFollowingQuery {
 }
 
 #[get("/{username}/following")]
-#[instrument]
+#[instrument(skip(state))]
 pub async fn get_following(
 	state: web::Data<AppState>,
 	path: web::Path<String>,

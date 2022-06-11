@@ -28,7 +28,7 @@ use chrono::Utc;
 use tracing::instrument;
 use uuid::Uuid;
 
-#[instrument(skip(state))]
+#[instrument(skip(state, username))]
 pub async fn post_create(
 	state: web::Data<AppState>,
 	body: Create,

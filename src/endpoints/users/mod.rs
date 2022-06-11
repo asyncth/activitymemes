@@ -36,7 +36,7 @@ use sqlx::Row;
 use tracing::instrument;
 
 #[get("/{username}")]
-#[instrument]
+#[instrument(skip(state))]
 pub async fn get_user(
 	state: web::Data<AppState>,
 	path: web::Path<String>,

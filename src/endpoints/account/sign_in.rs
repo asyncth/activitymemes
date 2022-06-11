@@ -36,7 +36,7 @@ pub struct PostSignIn {
 }
 
 #[post("/sign-in")]
-#[instrument]
+#[instrument(skip(state))]
 pub async fn post_sign_in(
 	state: web::Data<AppState>,
 	body: web::Json<PostSignIn>,

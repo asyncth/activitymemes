@@ -37,7 +37,7 @@ pub struct GetOutboxQuery {
 }
 
 #[get("/{username}/outbox")]
-#[instrument]
+#[instrument(skip(state))]
 pub async fn get_outbox(
 	state: web::Data<AppState>,
 	path: web::Path<String>,
@@ -93,7 +93,7 @@ pub async fn get_outbox(
 }
 
 #[post("/{username}/outbox")]
-#[instrument]
+#[instrument(skip(state, req))]
 pub async fn post_outbox(
 	state: web::Data<AppState>,
 	path: web::Path<String>,

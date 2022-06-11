@@ -25,7 +25,7 @@ use sqlx::Row;
 use tracing::instrument;
 use uuid::Uuid;
 
-#[instrument(skip(state))]
+#[instrument(skip(state, username))]
 pub async fn post_follow(
 	state: web::Data<AppState>,
 	body: Follow,

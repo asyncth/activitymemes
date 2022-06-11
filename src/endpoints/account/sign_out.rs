@@ -14,16 +14,12 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::error::ApiError;
-use crate::state::AppState;
-use actix_web::{post, web, HttpRequest, HttpResponse};
+use actix_web::{post, HttpRequest, HttpResponse};
 use tracing::instrument;
 
 #[post("/sign-out")]
-#[instrument]
-pub async fn post_sign_out(
-	state: web::Data<AppState>,
-	req: HttpRequest,
-) -> Result<HttpResponse, ApiError> {
+#[instrument(skip(req))]
+pub async fn post_sign_out(req: HttpRequest) -> Result<HttpResponse, ApiError> {
 	if let Some(mut cookie) = req.cookie("session") {
 		cookie.make_removal();
 		Ok(HttpResponse::Ok().cookie(cookie).finish())

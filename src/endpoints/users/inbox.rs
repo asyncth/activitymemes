@@ -34,7 +34,7 @@ pub struct GetInboxQuery {
 }
 
 #[get("/{username}/inbox")]
-#[instrument]
+#[instrument(skip(state, req))]
 pub async fn get_inbox(
 	state: web::Data<AppState>,
 	path: web::Path<String>,

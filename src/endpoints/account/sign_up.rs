@@ -38,7 +38,7 @@ pub struct PostSignUpBody {
 }
 
 #[post("/sign-up")]
-#[instrument]
+#[instrument(skip(state))]
 pub async fn post_sign_up(
 	state: web::Data<AppState>,
 	body: web::Json<PostSignUpBody>,

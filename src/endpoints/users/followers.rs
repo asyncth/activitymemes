@@ -33,7 +33,7 @@ pub struct GetFollowersQuery {
 }
 
 #[get("/{username}/followers")]
-#[instrument]
+#[instrument(skip(state))]
 pub async fn get_followers(
 	state: web::Data<AppState>,
 	path: web::Path<String>,

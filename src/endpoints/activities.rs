@@ -23,11 +23,11 @@ use tracing::instrument;
 use uuid::Uuid;
 
 #[get("/{id}")]
-#[instrument]
+#[instrument(skip(state, req))]
 pub async fn get_activity(
 	state: web::Data<AppState>,
-	req: HttpRequest,
 	path: web::Path<String>,
+	req: HttpRequest,
 ) -> Result<web::Json<JsonValue>, ApiError> {
 	let activity_id = path.into_inner();
 	let activity_id = Uuid::parse_str(&activity_id).map_err(|_| ApiError::ResourceNotFound)?;
@@ -68,11 +68,11 @@ pub async fn get_activity(
 }
 
 #[get("/{id}/object")]
-#[instrument]
+#[instrument(skip(state, req))]
 pub async fn get_object(
 	state: web::Data<AppState>,
-	req: HttpRequest,
 	path: web::Path<String>,
+	req: HttpRequest,
 ) -> Result<web::Json<JsonValue>, ApiError> {
 	let activity_id = path.into_inner();
 	let activity_id = Uuid::parse_str(&activity_id).map_err(|_| ApiError::ResourceNotFound)?;

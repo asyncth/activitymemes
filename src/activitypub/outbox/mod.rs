@@ -29,7 +29,7 @@ use actix_web::{web, HttpResponse};
 use tracing::instrument;
 use uuid::Uuid;
 
-#[instrument]
+#[instrument(skip(state, username))]
 pub async fn post_to_outbox(
 	state: web::Data<AppState>,
 	user_id: Uuid,
