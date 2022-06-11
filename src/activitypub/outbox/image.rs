@@ -100,7 +100,7 @@ pub async fn post_image(
 		let to_has_public_uri = to.has_public_uri;
 		let cc_has_public_uri = cc.has_public_uri;
 
-		(to, cc, to_has_public_uri && cc_has_public_uri)
+		(to, cc, to_has_public_uri || cc_has_public_uri)
 	} else if to.is_some() && cc.is_none() {
 		let to = to.unwrap();
 		let has_public_uri = to.has_public_uri;
