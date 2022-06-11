@@ -50,8 +50,7 @@ pub fn ensure_signed_in(state: &AppState, req: &HttpRequest) -> Option<String> {
 		validation.set_issuer(&["ActivityMemes Account Sign-In"]);
 
 		let decoded =
-			jsonwebtoken::decode::<Claims>(token, state.token_decoding_key.inner(), &validation)
-				.ok()?;
+			jsonwebtoken::decode::<Claims>(token, &state.token_decoding_key, &validation).ok()?;
 		let username = decoded.claims.sub;
 
 		Some(username)

@@ -101,7 +101,7 @@ pub trait Provider {
 #[derive(Debug)]
 pub struct Collection<T>
 where
-	T: Provider + Debug,
+	T: Provider,
 	<T as Provider>::Data: Debug,
 {
 	provider: T,
@@ -109,7 +109,7 @@ where
 
 impl<T> Collection<T>
 where
-	T: Provider + Debug,
+	T: Provider,
 	<T as Provider>::Data: Debug,
 {
 	pub fn new(provider: T) -> Self {
@@ -121,12 +121,12 @@ where
 		Stream::new(&self.provider, data)
 	}
 
-	#[instrument]
+	#[instrument(skip(self))]
 	pub fn id<'a>(&'a self, data: &'a <T as Provider>::Data) -> Cow<'a, str> {
 		self.provider.activitypub_id(data)
 	}
 
-	#[instrument]
+	#[instrument(skip(self))]
 	pub async fn len(&self, data: &<T as Provider>::Data) -> Result<u64, ApiError> {
 		self.provider.total_items(data).await.map_err(|err| {
 			error!(?err, "Failed to get the length of a collection");
@@ -134,7 +134,7 @@ where
 		})
 	}
 
-	#[instrument]
+	#[instrument(skip(self))]
 	pub async fn index_page(
 		&self,
 		data: &<T as Provider>::Data,
@@ -156,7 +156,7 @@ where
 		Ok(collection)
 	}
 
-	#[instrument]
+	#[instrument(skip(self))]
 	pub async fn first_page(
 		&self,
 		data: &<T as Provider>::Data,
@@ -171,7 +171,7 @@ where
 		Ok(page)
 	}
 
-	#[instrument]
+	#[instrument(skip(self))]
 	pub async fn max_id_page(
 		&self,
 		max_id: i64,
@@ -191,7 +191,7 @@ where
 		Ok(page)
 	}
 
-	#[instrument]
+	#[instrument(skip(self))]
 	pub async fn min_id_page(
 		&self,
 		min_id: i64,
@@ -211,7 +211,7 @@ where
 		Ok(page)
 	}
 
-	#[instrument]
+	#[instrument(skip(self))]
 	fn prepare_page<'a>(
 		&'a self,
 		data: &'a <T as Provider>::Data,
@@ -230,7 +230,7 @@ where
 		Ok((part_of, page))
 	}
 
-	#[instrument(skip(page, items))]
+	#[instrument(skip(self, page, items))]
 	fn add_next_prev_and_finalize(
 		&self,
 		page: &mut OrderedCollectionPage,

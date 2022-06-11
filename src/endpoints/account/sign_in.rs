@@ -91,7 +91,7 @@ pub async fn post_sign_in(
 	let token = jsonwebtoken::encode(
 		&Header::new(Algorithm::RS512),
 		&claims,
-		state.token_encoding_key.inner(),
+		&state.token_encoding_key,
 	)?;
 
 	Ok(HttpResponse::Ok()

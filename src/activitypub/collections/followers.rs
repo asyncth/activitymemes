@@ -30,7 +30,7 @@ pub struct Data {
 	pub username: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Followers {
 	state: web::Data<AppState>,
 }

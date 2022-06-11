@@ -31,7 +31,7 @@ pub struct Data {
 	pub username: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Inbox {
 	state: web::Data<AppState>,
 }

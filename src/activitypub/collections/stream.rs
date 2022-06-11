@@ -27,7 +27,7 @@ use tracing::error;
 #[pin_project]
 pub struct Stream<'a, T>
 where
-	T: Provider + Debug,
+	T: Provider,
 	<T as Provider>::Data: Debug,
 {
 	fut: Pin<Box<dyn Future<Output = Result<Items, <T as Provider>::Error>> + 'a>>,
@@ -40,7 +40,7 @@ where
 
 impl<'a, T> Stream<'a, T>
 where
-	T: Provider + Debug,
+	T: Provider,
 	<T as Provider>::Data: Debug,
 {
 	pub fn new(provider: &'a T, data: &'a <T as Provider>::Data) -> Self {
@@ -57,7 +57,7 @@ where
 
 impl<T> FuturesStream for Stream<'_, T>
 where
-	T: Provider + Debug,
+	T: Provider,
 	<T as Provider>::Data: Debug,
 {
 	type Item = Result<Item, ApiError>;

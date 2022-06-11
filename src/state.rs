@@ -14,15 +14,14 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::config::Config;
-use jsonwebtoken::{DecodingKey as JwtDecodingKey, EncodingKey as JwtEncodingKey};
+use jsonwebtoken::{DecodingKey, EncodingKey};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use std::error::Error;
-use std::fmt::Debug;
 use std::fs;
 use tracing::instrument;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct AppState {
 	pub scheme: String,
 	pub domain: String,
@@ -39,12 +38,10 @@ impl AppState {
 			.connect(&config.db_connection_uri)
 			.await?;
 
-		let token_encoding_key = EncodingKey(JwtEncodingKey::from_rsa_pem(&fs::read(
-			config.token_rsa_private_key_pem_filepath,
-		)?)?);
-		let token_decoding_key = DecodingKey(JwtDecodingKey::from_rsa_pem(&fs::read(
-			config.token_rsa_public_key_pem_filepath,
-		)?)?);
+		let token_encoding_key =
+			EncodingKey::from_rsa_pem(&fs::read(config.token_rsa_private_key_pem_filepath)?)?;
+		let token_decoding_key =
+			DecodingKey::from_rsa_pem(&fs::read(config.token_rsa_public_key_pem_filepath)?)?;
 
 		Ok(Self {
 			scheme: config.scheme,
@@ -53,35 +50,5 @@ impl AppState {
 			token_decoding_key,
 			db,
 		})
-	}
-}
-
-#[derive(Clone)]
-pub struct EncodingKey(JwtEncodingKey);
-
-impl EncodingKey {
-	pub fn inner(&self) -> &JwtEncodingKey {
-		&self.0
-	}
-}
-
-impl Debug for EncodingKey {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("EncodingKey").finish()
-	}
-}
-
-#[derive(Clone)]
-pub struct DecodingKey(JwtDecodingKey);
-
-impl DecodingKey {
-	pub fn inner(&self) -> &JwtDecodingKey {
-		&self.0
-	}
-}
-
-impl Debug for DecodingKey {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("DecodingKey").finish()
 	}
 }
