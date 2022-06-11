@@ -54,10 +54,10 @@ pub async fn post_create(
 		let object_to = object_handlers::get_to(&image);
 		let object_cc = object_handlers::get_cc(&image);
 
-		let object_to = object_to.unwrap_or_else(Vec::new);
-		let object_cc = object_cc.unwrap_or_else(Vec::new);
-		let activity_to = activity_to.unwrap_or_else(Vec::new);
-		let activity_cc = activity_cc.unwrap_or_else(Vec::new);
+		let object_to = object_to.unwrap_or_default();
+		let object_cc = object_cc.unwrap_or_default();
+		let activity_to = activity_to.unwrap_or_default();
+		let activity_cc = activity_cc.unwrap_or_default();
 
 		let (to, cc) = utils::merge_and_limit_mentions(
 			object_to.into_iter(),

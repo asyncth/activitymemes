@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+// TODO: Fix this issue.
+#![allow(clippy::unnecessary_unwrap)]
+
 use crate::error::ApiError;
 use crate::url;
 use activitystreams::activity::properties::ActorAndObjectProperties;
