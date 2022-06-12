@@ -30,9 +30,10 @@ use crate::state::AppState;
 use crate::url;
 use activitystreams::actor::properties::ApActorProperties;
 use activitystreams::actor::Person;
-use activitystreams::ext::{Ext, Extensible};
+use activitystreams::ext::Extensible;
 use actix_web::{get, web};
 use sqlx::Row;
+use std::collections::HashMap;
 use tracing::instrument;
 
 #[get("/{username}")]
@@ -40,11 +41,11 @@ use tracing::instrument;
 pub async fn get_user(
 	state: web::Data<AppState>,
 	path: web::Path<String>,
-) -> Result<web::Json<Ext<Person, ApActorProperties>>, ApiError> {
+) -> Result<web::Json<serde_json::Value>, ApiError> {
 	let username = path.into_inner();
 
 	let row =
-		sqlx::query("SELECT name, bio, profile_picture_id FROM users WHERE username = $1 AND this_instance = TRUE")
+		sqlx::query("SELECT name, bio, profile_picture_id, public_key FROM users WHERE username = $1 AND this_instance = TRUE")
 			.bind(&username)
 			.fetch_optional(&state.db)
 			.await?;
@@ -76,13 +77,31 @@ pub async fn get_user(
 		))?;
 	}
 
+	let public_key: &str = row.get(3);
+
 	let user_ap_props = &mut user.extension;
 
-	user_ap_props.set_preferred_username(username)?;
+	user_ap_props.set_preferred_username(username.clone())?;
 	user_ap_props.set_inbox(format!("{}/inbox", &actor_url))?;
 	user_ap_props.set_outbox(format!("{}/outbox", &actor_url))?;
 	user_ap_props.set_following(format!("{}/following", &actor_url))?;
 	user_ap_props.set_followers(format!("{}/followers", &actor_url))?;
 
-	Ok(web::Json(user))
+	let serialized_data = serde_json::to_value(user)?;
+	let mut deserialized_data: HashMap<String, serde_json::Value> =
+		serde_json::from_value(serialized_data)?;
+	let user_url = url::activitypub_actor(&username);
+
+	deserialized_data.insert(
+		"publicKey".to_string(),
+		serde_json::json!({
+			"id": format!("{}#main-key", user_url),
+			"owner": user_url,
+			"publicKeyPem": public_key
+		}),
+	);
+
+	let serialized_data = serde_json::to_value(deserialized_data)?;
+
+	Ok(web::Json(serialized_data))
 }

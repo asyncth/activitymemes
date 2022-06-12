@@ -16,10 +16,14 @@
 use activitystreams::primitives::XsdAnyUriError;
 use actix_web::error::PayloadError;
 use actix_web::http::StatusCode;
+use actix_web::rt::task::JoinError;
 use actix_web::{HttpResponse, ResponseError};
 use awc::error::SendRequestError;
 use jsonwebtoken::errors::Error as JwtError;
 use pbkdf2::password_hash::Error as Pbkdf2Error;
+use rsa::errors::Error as RsaError;
+use rsa::pkcs8::spki::Error as RsaPkcs8SpkiError;
+use rsa::pkcs8::Error as RsaPkcs8Error;
 use serde_json::{json, Error as SerdeJsonError};
 use std::convert::Infallible;
 use std::fmt;
@@ -145,6 +149,34 @@ impl From<SendRequestError> for ApiError {
 impl From<PayloadError> for ApiError {
 	fn from(err: PayloadError) -> Self {
 		error!(?err, "Failed to get the body of a HTTP response");
+		Self::InternalServerError
+	}
+}
+
+impl From<JoinError> for ApiError {
+	fn from(err: JoinError) -> Self {
+		error!(?err, "Failed to join tasks");
+		Self::InternalServerError
+	}
+}
+
+impl From<RsaError> for ApiError {
+	fn from(err: RsaError) -> Self {
+		error!(?err, "RSA error");
+		Self::InternalServerError
+	}
+}
+
+impl From<RsaPkcs8Error> for ApiError {
+	fn from(err: RsaPkcs8Error) -> Self {
+		error!(?err, "RSA PKCS#8 error");
+		Self::InternalServerError
+	}
+}
+
+impl From<RsaPkcs8SpkiError> for ApiError {
+	fn from(err: RsaPkcs8SpkiError) -> Self {
+		error!(?err, "RSA PKCS#8 SPKI error");
 		Self::InternalServerError
 	}
 }

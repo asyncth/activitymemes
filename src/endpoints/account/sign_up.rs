@@ -16,6 +16,7 @@
 use crate::account::{EMAIL_REGEX, RNG};
 use crate::error::ApiError;
 use crate::state::AppState;
+use actix_web::rt::task;
 use actix_web::{post, web, HttpResponse};
 use once_cell::sync::Lazy;
 use pbkdf2::{
@@ -23,6 +24,8 @@ use pbkdf2::{
 	Pbkdf2,
 };
 use regex::Regex;
+use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
+use rsa::RsaPrivateKey;
 use serde::Deserialize;
 use sqlx::Row;
 use tracing::instrument;
@@ -81,15 +84,25 @@ pub async fn post_sign_up(
 		.hash_password(body.password.as_bytes(), &password_salt)
 		.map(|hash| hash.to_string())?;
 
+	let private_key =
+		task::spawn_blocking(|| RNG.with(|cell| RsaPrivateKey::new(&mut *cell.borrow_mut(), 3072)))
+			.await??;
+	let public_key = private_key.to_public_key();
+
+	let private_key = private_key.to_pkcs8_pem(LineEnding::LF)?;
+	let public_key = public_key.to_public_key_pem(LineEnding::LF)?;
+
 	let uuid = Uuid::new_v4();
 	sqlx::query(
-        "INSERT INTO users (id, username, this_instance, instance_url, email, password, name) VALUES ($1, $2, TRUE, NULL, $3, $4, $5)",
+        "INSERT INTO users (id, username, this_instance, instance_url, email, password, name, public_key, private_key) VALUES ($1, $2, TRUE, NULL, $3, $4, $5, $6, $7)",
     )
     .bind(uuid)
     .bind(&body.username)
     .bind(&body.email)
     .bind(hashed_password)
     .bind(&body.username)
+	.bind(public_key)
+	.bind(&*private_key)
     .execute(&state.db)
     .await?;
 

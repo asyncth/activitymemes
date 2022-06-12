@@ -7,7 +7,9 @@ CREATE TABLE users (
 	password text,
 	name text,
 	bio text,
-	profile_picture_id text
+	profile_picture_id text,
+	public_key text UNIQUE,
+	private_key text UNIQUE
 );
 
 CREATE INDEX users_username_idx ON users (username);
