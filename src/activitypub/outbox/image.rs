@@ -17,16 +17,21 @@
 #![allow(clippy::unnecessary_unwrap)]
 
 use crate::activitypub::object_handlers;
-use crate::activitypub::object_handlers::utils::{self, ToCcUuids};
+use crate::activitypub::object_handlers::utils::{
+	self, RemoteOrLocalId, ToCcUuids, ToCcUuidsRemoteAware,
+};
 use crate::error::ApiError;
 use crate::state::AppState;
-use crate::url;
+use crate::{routines, url};
 use activitystreams::object::Image;
 use activitystreams::primitives::XsdAnyUri;
 use actix_web::http::header;
 use actix_web::web;
 use actix_web::HttpResponse;
 use chrono::Utc;
+use rsa::pkcs8::DecodePrivateKey;
+use rsa::RsaPrivateKey;
+use sqlx::Row;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -105,22 +110,40 @@ pub async fn post_image(
 		let to = to.unwrap();
 		let has_public_uri = to.has_public_uri;
 
-		(to, ToCcUuids::default(), has_public_uri)
+		(to, ToCcUuidsRemoteAware::default(), has_public_uri)
 	} else if to.is_none() && cc.is_some() {
 		let cc = cc.unwrap();
 		let has_public_uri = cc.has_public_uri;
 
-		(ToCcUuids::default(), cc, has_public_uri)
+		(ToCcUuidsRemoteAware::default(), cc, has_public_uri)
 	} else {
 		unreachable!();
 	};
+
+	// TODO now: dedup `to` and `cc`.
+	// TODO now: remove these clones.
+	let mut deliver_to = Vec::new();
+	for id in &to.mentions {
+		if let RemoteOrLocalId::Remote(_, url) = id {
+			deliver_to.push(url.clone());
+		}
+	}
+
+	for id in &cc.mentions {
+		if let RemoteOrLocalId::Remote(_, url) = id {
+			deliver_to.push(url.clone());
+		}
+	}
+
+	let to: ToCcUuids = to.into();
+	let cc: ToCcUuids = cc.into();
 
 	let serialized_activity = serde_json::to_value(activity)?;
 	sqlx::query("INSERT INTO activities (id, user_id, this_instance, published_at, activity, is_public, to_mentions, cc_mentions, to_followers_of, cc_followers_of) VALUES ($1, $2, TRUE, $3, $4, $5, $6, $7, $8, $9)")
 		.bind(activity_id)
 		.bind(user_id)
 		.bind(published_at)
-		.bind(serialized_activity)
+		.bind(&serialized_activity)
 		.bind(is_public)
 		.bind(to.mentions)
 		.bind(cc.mentions)
@@ -128,6 +151,24 @@ pub async fn post_image(
 		.bind(cc.followers_of)
 		.execute(&state.db)
 		.await?;
+
+	if !deliver_to.is_empty() {
+		let private_key_pem: String = sqlx::query("SELECT private_key FROM users WHERE id = $1")
+			.bind(user_id)
+			.fetch_one(&state.db)
+			.await?
+			.get(0);
+
+		let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_pem)?;
+
+		actix_web::rt::spawn(routines::deliver_activity(
+			state.clone(),
+			serialized_activity,
+			deliver_to,
+			url::activitypub_actor(username),
+			private_key,
+		));
+	}
 
 	Ok(HttpResponse::Created()
 		.insert_header((header::LOCATION, activity_url))

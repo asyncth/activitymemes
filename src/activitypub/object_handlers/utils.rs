@@ -36,23 +36,63 @@ pub struct ToCcUuids {
 	pub has_public_uri: bool,
 }
 
+impl From<ToCcUuidsRemoteAware> for ToCcUuids {
+	fn from(val: ToCcUuidsRemoteAware) -> Self {
+		let mut mentions = Vec::with_capacity(val.mentions.len());
+		let mut followers_of = Vec::with_capacity(val.followers_of.len());
+
+		for id in val.mentions {
+			match id {
+				RemoteOrLocalId::Remote(id, _) => mentions.push(id),
+				RemoteOrLocalId::Local(id) => mentions.push(id),
+			}
+		}
+
+		for id in val.followers_of {
+			match id {
+				RemoteOrLocalId::Remote(id, _) => followers_of.push(id),
+				RemoteOrLocalId::Local(id) => followers_of.push(id),
+			}
+		}
+
+		Self {
+			mentions,
+			followers_of,
+			has_public_uri: val.has_public_uri,
+		}
+	}
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ToCcUuidsRemoteAware {
+	pub mentions: Vec<RemoteOrLocalId>,
+	pub followers_of: Vec<RemoteOrLocalId>,
+	pub has_public_uri: bool,
+}
+
 #[derive(Clone, Debug)]
 pub enum ToCcUuid {
-	DirectMention(Uuid),
-	MentionOfFollowersOf(Uuid),
+	DirectMention(RemoteOrLocalId),
+	MentionOfFollowersOf(RemoteOrLocalId),
+}
+
+#[derive(Clone, Debug)]
+pub enum RemoteOrLocalId {
+	Remote(Uuid, Url),
+	Local(Uuid),
 }
 
 #[instrument(skip(state, urls))]
 pub async fn actor_urls_to_uuids<'a, I>(
 	state: web::Data<AppState>,
 	urls: I,
-) -> Result<ToCcUuids, ApiError>
+) -> Result<ToCcUuidsRemoteAware, ApiError>
 where
 	I: IntoIterator<Item = &'a XsdAnyUri>,
 {
 	let urls = urls.into_iter();
 
-	let mut uuids = ToCcUuids::default();
+	let mut uuids = ToCcUuidsRemoteAware::default();
 	let mut futures = Vec::with_capacity(urls.size_hint().0);
 
 	for url in urls {
@@ -99,7 +139,7 @@ async fn actor_url_to_uuid(state: web::Data<AppState>, url: &str) -> Result<ToCc
 		}
 		let user_id = user_id.unwrap();
 
-		return Ok(ToCcUuid::DirectMention(user_id));
+		return Ok(ToCcUuid::DirectMention(RemoteOrLocalId::Local(user_id)));
 	}
 
 	// If the URL points to the followers collection of a same-instance user.
@@ -116,7 +156,9 @@ async fn actor_url_to_uuid(state: web::Data<AppState>, url: &str) -> Result<ToCc
 		}
 		let user_id = user_id.unwrap();
 
-		return Ok(ToCcUuid::MentionOfFollowersOf(user_id));
+		return Ok(ToCcUuid::MentionOfFollowersOf(RemoteOrLocalId::Local(
+			user_id,
+		)));
 	}
 
 	// If the URL points to neither, see if it has our domain.
@@ -129,8 +171,10 @@ async fn actor_url_to_uuid(state: web::Data<AppState>, url: &str) -> Result<ToCc
 
 	// If not, try to fetch it from the database if it's saved there already
 	// or fetch it from the URL.
-	let user_id = routines::fetch_remote_actor(&state, url).await?;
-	Ok(ToCcUuid::DirectMention(user_id))
+	let user_id = routines::fetch_remote_actor(&state, &url).await?;
+	Ok(ToCcUuid::DirectMention(RemoteOrLocalId::Remote(
+		user_id, url,
+	)))
 }
 
 pub fn limit_to_and_cc<'a, I>(iter: I) -> Result<Vec<XsdAnyUri>, ApiError>

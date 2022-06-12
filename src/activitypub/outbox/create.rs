@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::activitypub::object_handlers::utils::{RemoteOrLocalId, ToCcUuids};
 use crate::activitypub::object_handlers::{self, utils};
 use crate::error::ApiError;
 use crate::state::AppState;
-use crate::url;
+use crate::{routines, url};
 use activitystreams::activity::Create;
 use activitystreams::object::kind::ImageType;
 use activitystreams::object::Image;
@@ -25,6 +26,9 @@ use activitystreams::BaseBox;
 use actix_web::http::header;
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
+use rsa::pkcs8::DecodePrivateKey;
+use rsa::RsaPrivateKey;
+use sqlx::Row;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -93,6 +97,23 @@ pub async fn post_create(
 	let to = utils::actor_urls_to_uuids(state.clone(), to.iter()).await?;
 	let cc = utils::actor_urls_to_uuids(state.clone(), cc.iter()).await?;
 
+	// TODO now: dedup `to` and `cc`.
+	let mut deliver_to = Vec::new();
+	for id in &to.mentions {
+		if let RemoteOrLocalId::Remote(_, url) = id {
+			deliver_to.push(url.clone());
+		}
+	}
+
+	for id in &cc.mentions {
+		if let RemoteOrLocalId::Remote(_, url) = id {
+			deliver_to.push(url.clone());
+		}
+	}
+
+	let to: ToCcUuids = to.into();
+	let cc: ToCcUuids = cc.into();
+
 	let is_public = to.has_public_uri || cc.has_public_uri;
 
 	let serialized_activity = serde_json::to_value(new_create)?;
@@ -100,7 +121,7 @@ pub async fn post_create(
 		.bind(activity_id)
 		.bind(user_id)
 		.bind(published_at)
-		.bind(serialized_activity)
+		.bind(&serialized_activity)
 		.bind(is_public)
 		.bind(to.mentions)
 		.bind(cc.mentions)
@@ -108,6 +129,24 @@ pub async fn post_create(
 		.bind(cc.followers_of)
 		.execute(&state.db)
 		.await?;
+
+	if !deliver_to.is_empty() {
+		let private_key_pem: String = sqlx::query("SELECT private_key FROM users WHERE id = $1")
+			.bind(user_id)
+			.fetch_one(&state.db)
+			.await?
+			.get(0);
+
+		let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_pem)?;
+
+		actix_web::rt::spawn(routines::deliver_activity(
+			state.clone(),
+			serialized_activity,
+			deliver_to,
+			url::activitypub_actor(username),
+			private_key,
+		));
+	}
 
 	Ok(HttpResponse::Created()
 		.insert_header((header::LOCATION, activity_url))

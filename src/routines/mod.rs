@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod delivery;
+
+pub use delivery::deliver_activity;
+
 use crate::error::ApiError;
 use crate::state::AppState;
 use activitystreams::actor::properties::ApActorProperties;
@@ -33,7 +37,7 @@ thread_local! {
 }
 
 #[instrument(skip(state))]
-pub async fn fetch_remote_actor(state: &AppState, actor_id: Url) -> Result<Uuid, ApiError> {
+pub async fn fetch_remote_actor(state: &AppState, actor_id: &Url) -> Result<Uuid, ApiError> {
 	let user_id: Option<Uuid> =
 		sqlx::query("SELECT id FROM users WHERE this_instance = FALSE and instance_url = $1")
 			.bind(actor_id.as_str())
