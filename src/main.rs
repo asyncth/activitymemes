@@ -21,6 +21,7 @@ mod config;
 mod endpoints;
 mod error;
 mod routines;
+mod signatures;
 mod state;
 mod url;
 
