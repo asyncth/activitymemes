@@ -47,6 +47,7 @@ pub enum ApiError {
 	ResourceNotFound,
 	BadUrl,
 	UnexpectedResponseFromFederatedServer,
+	FailedDeliveryDueToNetworkError,
 	OtherBadRequest,
 }
 
@@ -69,7 +70,10 @@ impl fmt::Display for ApiError {
 			Self::ResourceNotFound => write!(f, "Resource not found."),
 			Self::BadUrl => write!(f, "Bad URL."),
 			Self::UnexpectedResponseFromFederatedServer => {
-				write!(f, "Incorrect reply from federated server.")
+				write!(f, "Unexpected response from a federated server.")
+			}
+			Self::FailedDeliveryDueToNetworkError => {
+				write!(f, "Failed delivery due to network error.")
 			}
 			Self::OtherBadRequest => write!(f, "Bad request."),
 		}

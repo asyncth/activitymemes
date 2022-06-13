@@ -29,6 +29,7 @@ use awc::http::{header, StatusCode};
 use futures::future;
 use rsa::RsaPrivateKey;
 use std::collections::HashSet;
+use std::str;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{error, instrument};
@@ -67,9 +68,13 @@ pub async fn deliver_activity(
 	let mut failed_delivery_recipients = Vec::new();
 
 	for result in results {
-		if let Err((recipient, err)) = result? {
-			error!(?err, "Delivery failed");
-			failed_delivery_recipients.push(recipient);
+		match result? {
+			Ok(()) => (),
+			Err((recipient, ApiError::FailedDeliveryDueToNetworkError)) => {
+				error!("Failed to deliver an activity due to a network error.");
+				failed_delivery_recipients.push(recipient);
+			}
+			Err((_, _)) => (),
 		}
 	}
 
@@ -85,7 +90,7 @@ pub async fn deliver_activity(
 	Ok(())
 }
 
-#[instrument(skip(activity, recipient, private_key, digest))]
+#[instrument(skip(activity, recipient, actor_id, private_key, digest))]
 async fn deliver_activity_inner(
 	activity: Arc<serde_json::Value>,
 	recipient: Url,
@@ -107,8 +112,7 @@ async fn deliver_activity_innermost(
 	digest: Arc<String>,
 ) -> Result<(), ApiError> {
 	if recipient.scheme() != "https" {
-		// Just ignore the delivery request.
-		return Ok(());
+		return Err(ApiError::OtherBadRequest);
 	}
 
 	let request = CLIENT.with(|client| {
@@ -121,10 +125,12 @@ async fn deliver_activity_innermost(
 			.send()
 	});
 
-	let mut response = request.await?;
+	let mut response = request
+		.await
+		.map_err(|_| ApiError::FailedDeliveryDueToNetworkError)?;
 	if response.status() == StatusCode::METHOD_NOT_ALLOWED {
-		// Is a non-federated server. Ignore the delivery request.
-		return Ok(());
+		// Is a non-federated server. Don't retry.
+		return Err(ApiError::OtherBadRequest);
 	}
 
 	let body = response.body().await?;
@@ -144,8 +150,7 @@ async fn deliver_activity_innermost(
 	};
 
 	if inbox_url.scheme() != "https" {
-		// Ignore the delivery request.
-		return Ok(());
+		return Err(ApiError::UnexpectedResponseFromFederatedServer);
 	}
 
 	let host_header_val = if let Some(host) = inbox_url.host_str() {
@@ -155,8 +160,7 @@ async fn deliver_activity_innermost(
 			host.to_string()
 		}
 	} else {
-		// Ignore the delivery request.
-		return Ok(());
+		return Err(ApiError::UnexpectedResponseFromFederatedServer);
 	};
 
 	let now = SystemTime::now();
@@ -184,14 +188,29 @@ async fn deliver_activity_innermost(
 			.send_json(&activity)
 	});
 
-	let response = request.await?;
+	let mut response = request
+		.await
+		.map_err(|_| ApiError::FailedDeliveryDueToNetworkError)?;
 	if response.status().is_success() {
 		Ok(())
 	} else {
-		error!(
-			"Failed to deliver an activity. Status code: {}.",
-			response.status()
-		);
+		let body = response.body().await?;
+		let body = str::from_utf8(&body);
+		let status_code = response.status();
+
+		if let Ok(body) = body {
+			error!(
+				?status_code,
+				?body,
+				"Failed to deliver an activity due to non-2xx status code.",
+			);
+		} else {
+			error!(
+				?status_code,
+				"Failed to deliver an activity due to non-2xx status code.",
+			);
+		}
+
 		Err(ApiError::UnexpectedResponseFromFederatedServer)
 	}
 }
