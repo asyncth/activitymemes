@@ -28,32 +28,31 @@ use awc::http::header::HttpDate;
 use awc::http::{header, StatusCode};
 use futures::future;
 use rsa::RsaPrivateKey;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{error, instrument};
 use url::Url;
 
 #[instrument(skip(state, activity, recipients, private_key))]
-pub async fn deliver_activity<I>(
+pub async fn deliver_activity(
 	state: web::Data<AppState>,
 	activity: serde_json::Value,
-	recipients: I,
+	mut recipients: HashSet<Url>,
 	actor_id: String,
 	private_key: RsaPrivateKey,
-) -> Result<(), ApiError>
-where
-	I: IntoIterator<Item = Url>,
-{
+) -> Result<(), ApiError> {
 	let activity_bytes = serde_json::to_vec(&activity)?;
 	let digest = signatures::digest(&activity_bytes);
 
-	let recipients = recipients.into_iter();
 	let actor_id = Arc::new(actor_id);
 	let private_key = Arc::new(private_key);
 	let activity = Arc::new(activity);
 	let digest = Arc::new(digest);
 
-	let mut tasks = Vec::with_capacity(recipients.size_hint().0);
+	recipients.remove(&Url::parse(&actor_id)?);
+
+	let mut tasks = Vec::with_capacity(recipients.len());
 	for recipient in recipients {
 		tasks.push(actix_web::rt::spawn(deliver_activity_inner(
 			Arc::clone(&activity),

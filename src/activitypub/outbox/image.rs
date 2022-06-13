@@ -32,6 +32,7 @@ use chrono::Utc;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::RsaPrivateKey;
 use sqlx::Row;
+use std::collections::HashSet;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -120,18 +121,16 @@ pub async fn post_image(
 		unreachable!();
 	};
 
-	// TODO now: dedup `to` and `cc`.
-	// TODO now: remove these clones.
-	let mut deliver_to = Vec::new();
+	let mut deliver_to = HashSet::new();
 	for id in &to.mentions {
 		if let RemoteOrLocalId::Remote(_, url) = id {
-			deliver_to.push(url.clone());
+			deliver_to.insert(url.clone());
 		}
 	}
 
 	for id in &cc.mentions {
 		if let RemoteOrLocalId::Remote(_, url) = id {
-			deliver_to.push(url.clone());
+			deliver_to.insert(url.clone());
 		}
 	}
 
