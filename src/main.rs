@@ -25,10 +25,12 @@ mod signatures;
 mod state;
 mod url;
 
-use actix_web::{web, App, HttpServer};
 use config::Config;
-use sqlx::migrate::Migrator;
+use routines::delivery;
 use state::AppState;
+
+use actix_web::{rt as actix_rt, web, App, HttpServer};
+use sqlx::migrate::Migrator;
 use std::error::Error;
 use std::process;
 use tracing::{instrument, Level};
@@ -61,6 +63,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 	MIGRATOR.run(&state.db).await?;
 
 	url::init(&state);
+	actix_rt::spawn(delivery::retry_deliveries(state.clone()));
 
 	HttpServer::new(move || {
 		App::new()

@@ -15,7 +15,7 @@
 
 pub mod delivery;
 
-pub use delivery::deliver_activity;
+pub use delivery::{deliver_activity, retry_deliveries};
 
 use crate::error::ApiError;
 use crate::state::AppState;

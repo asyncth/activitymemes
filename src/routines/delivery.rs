@@ -22,6 +22,7 @@ use activitystreams::actor::Person;
 use activitystreams::ext::Ext;
 use activitystreams::BaseBox;
 use actix_web::http::Method;
+use actix_web::rt as actix_rt;
 use actix_web::rt::time::Instant;
 use actix_web::web;
 use awc::http::header::HttpDate;
@@ -46,16 +47,52 @@ pub async fn deliver_activity(
 	let activity_bytes = serde_json::to_vec(&activity)?;
 	let digest = signatures::digest(&activity_bytes);
 
+	let activity = Arc::new(activity);
 	let actor_id = Arc::new(actor_id);
 	let private_key = Arc::new(private_key);
-	let activity = Arc::new(activity);
 	let digest = Arc::new(digest);
 
 	recipients.remove(&Url::parse(&actor_id)?);
+	let recipients = recipients.into_iter().collect();
+
+	deliver_activity_inner(
+		state,
+		activity,
+		recipients,
+		actor_id,
+		private_key,
+		digest,
+		1,
+	)
+	.await
+}
+
+#[instrument(skip(
+	state,
+	activity,
+	recipients,
+	actor_id,
+	private_key,
+	digest,
+	attempt_number
+))]
+async fn deliver_activity_inner(
+	state: web::Data<AppState>,
+	activity: Arc<serde_json::Value>,
+	recipients: Vec<Url>,
+	actor_id: Arc<String>,
+	private_key: Arc<RsaPrivateKey>,
+	digest: Arc<String>,
+	attempt_number: u32,
+) -> Result<(), ApiError> {
+	// Do not retry if it was tried more than 3 times.
+	if attempt_number > 3 {
+		return Ok(());
+	}
 
 	let mut tasks = Vec::with_capacity(recipients.len());
 	for recipient in recipients {
-		tasks.push(actix_web::rt::spawn(deliver_activity_inner(
+		tasks.push(actix_web::rt::spawn(deliver_activity_innermore(
 			Arc::clone(&activity),
 			recipient,
 			Arc::clone(&actor_id),
@@ -79,19 +116,60 @@ pub async fn deliver_activity(
 	}
 
 	if !failed_delivery_recipients.is_empty() {
-		let mut lock = state.delivery_retry_queue.write().unwrap();
-		lock.push_back(FailedDelivery {
+		let mut queue = state.delivery_retry_queue.lock().unwrap();
+		let is_empty = queue.is_empty();
+
+		queue.push_back(FailedDelivery {
 			activity,
 			recipients: failed_delivery_recipients,
-			time_to_retry: Instant::now() + Duration::from_secs(3600),
+			actor_id,
+			private_key,
+			digest,
+			last_time_tried: Instant::now(),
+			tried: attempt_number,
 		});
+
+		if is_empty {
+			state.delivery_retry_notify.notify_waiters();
+		}
 	}
 
 	Ok(())
 }
 
+#[instrument(skip(state))]
+pub async fn retry_deliveries(state: web::Data<AppState>) {
+	loop {
+		let mut queue = state.delivery_retry_queue.lock().unwrap();
+		let first = queue.pop_front();
+		drop(queue);
+
+		if let Some(failed_delivery) = first {
+			let wait_until = failed_delivery.last_time_tried + Duration::from_secs(3600);
+			let now = Instant::now();
+
+			if wait_until > now {
+				actix_rt::time::sleep_until(wait_until).await;
+			}
+
+			let _ = deliver_activity_inner(
+				state.clone(),
+				failed_delivery.activity,
+				failed_delivery.recipients,
+				failed_delivery.actor_id,
+				failed_delivery.private_key,
+				failed_delivery.digest,
+				failed_delivery.tried + 1,
+			)
+			.await;
+		} else {
+			state.delivery_retry_notify.notified().await;
+		}
+	}
+}
+
 #[instrument(skip(activity, recipient, actor_id, private_key, digest))]
-async fn deliver_activity_inner(
+async fn deliver_activity_innermore(
 	activity: Arc<serde_json::Value>,
 	recipient: Url,
 	actor_id: Arc<String>,

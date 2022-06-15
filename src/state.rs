@@ -16,12 +16,14 @@
 use crate::config::Config;
 use actix_web::rt::time::Instant;
 use jsonwebtoken::{DecodingKey, EncodingKey};
+use rsa::RsaPrivateKey;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use std::collections::VecDeque;
 use std::error::Error;
 use std::fs;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
+use tokio::sync::Notify;
 use tracing::instrument;
 use url::Url;
 
@@ -31,7 +33,8 @@ pub struct AppState {
 	pub token_encoding_key: EncodingKey,
 	pub token_decoding_key: DecodingKey,
 	pub db: Pool<Postgres>,
-	pub delivery_retry_queue: RwLock<VecDeque<FailedDelivery>>,
+	pub delivery_retry_queue: Mutex<VecDeque<FailedDelivery>>,
+	pub delivery_retry_notify: Notify,
 }
 
 impl AppState {
@@ -47,7 +50,8 @@ impl AppState {
 		let token_decoding_key =
 			DecodingKey::from_rsa_pem(&fs::read(config.token_rsa_public_key_pem_filepath)?)?;
 
-		let delivery_retry_queue = RwLock::new(VecDeque::new());
+		let delivery_retry_queue = Mutex::new(VecDeque::new());
+		let delivery_retry_notify = Notify::new();
 
 		Ok(Self {
 			scheme: config.scheme,
@@ -56,6 +60,7 @@ impl AppState {
 			token_decoding_key,
 			db,
 			delivery_retry_queue,
+			delivery_retry_notify,
 		})
 	}
 }
@@ -64,5 +69,9 @@ impl AppState {
 pub struct FailedDelivery {
 	pub activity: Arc<serde_json::Value>,
 	pub recipients: Vec<Url>,
-	pub time_to_retry: Instant,
+	pub actor_id: Arc<String>,
+	pub private_key: Arc<RsaPrivateKey>,
+	pub digest: Arc<String>,
+	pub last_time_tried: Instant,
+	pub tried: u32,
 }
