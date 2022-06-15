@@ -38,22 +38,13 @@ pub struct ToCcUuids {
 
 impl From<ToCcUuidsRemoteAware> for ToCcUuids {
 	fn from(val: ToCcUuidsRemoteAware) -> Self {
-		let mut mentions = Vec::with_capacity(val.mentions.len());
-		let mut followers_of = Vec::with_capacity(val.followers_of.len());
+		let f = |id| match id {
+			RemoteOrLocalId::Remote(id, _) => id,
+			RemoteOrLocalId::Local(id) => id,
+		};
 
-		for id in val.mentions {
-			match id {
-				RemoteOrLocalId::Remote(id, _) => mentions.push(id),
-				RemoteOrLocalId::Local(id) => mentions.push(id),
-			}
-		}
-
-		for id in val.followers_of {
-			match id {
-				RemoteOrLocalId::Remote(id, _) => followers_of.push(id),
-				RemoteOrLocalId::Local(id) => followers_of.push(id),
-			}
-		}
+		let mentions: Vec<Uuid> = val.mentions.into_iter().map(f).collect();
+		let followers_of: Vec<Uuid> = val.followers_of.into_iter().map(f).collect();
 
 		Self {
 			mentions,

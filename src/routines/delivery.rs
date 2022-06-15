@@ -21,9 +21,9 @@ use activitystreams::actor::properties::ApActorProperties;
 use activitystreams::actor::Person;
 use activitystreams::ext::Ext;
 use activitystreams::BaseBox;
+use actix_rt::time::Instant;
 use actix_web::http::Method;
 use actix_web::rt as actix_rt;
-use actix_web::rt::time::Instant;
 use actix_web::web;
 use awc::http::header::HttpDate;
 use awc::http::{header, StatusCode};
@@ -90,30 +90,46 @@ async fn deliver_activity_inner(
 		return Ok(());
 	}
 
-	let mut tasks = Vec::with_capacity(recipients.len());
-	for recipient in recipients {
-		tasks.push(actix_web::rt::spawn(deliver_activity_innermore(
-			Arc::clone(&activity),
-			recipient,
-			Arc::clone(&actor_id),
-			Arc::clone(&private_key),
-			Arc::clone(&digest),
-		)));
-	}
+	let tasks = recipients
+		.into_iter()
+		.map(|recipient| {
+			actix_rt::spawn(deliver_activity_innermore(
+				Arc::clone(&activity),
+				recipient,
+				Arc::clone(&actor_id),
+				Arc::clone(&private_key),
+				Arc::clone(&digest),
+			))
+		})
+		.collect::<Vec<_>>();
 
 	let results = future::join_all(tasks).await;
-	let mut failed_delivery_recipients = Vec::new();
-
-	for result in results {
-		match result? {
-			Ok(()) => (),
+	let failed_delivery_recipients: Vec<Url> = results
+		.into_iter()
+		.filter_map(|result| match result {
+			Ok(inner_result) => Some(inner_result),
+			Err(err) => {
+				error!(?err, "Failed to join delivery task");
+				None
+			}
+		})
+		.filter_map(|result| match result {
+			Ok(_) => None,
 			Err((recipient, ApiError::FailedDeliveryDueToNetworkError)) => {
 				error!("Failed to deliver an activity due to a network error.");
-				failed_delivery_recipients.push(recipient);
+				Some(recipient)
 			}
-			Err((_, _)) => (),
-		}
-	}
+			Err((recipient, err)) => {
+				error!(
+					?recipient,
+					?err,
+					"Failed to deliver an activity due to an error."
+				);
+
+				None
+			}
+		})
+		.collect();
 
 	if !failed_delivery_recipients.is_empty() {
 		let mut queue = state.delivery_retry_queue.lock().unwrap();
